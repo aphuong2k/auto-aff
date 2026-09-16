@@ -1,0 +1,452 @@
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-text">
+        <h2>Shopee Aff AI</h2>
+        <span>Command Center</span>
+      </div>
+    </div>
+
+    <!-- Status Indicator -->
+    <div class="status-box" [class.running]="stats.is_running">
+      <div class="status-dot"></div>
+      <div class="status-info">
+        <span class="status-label">Trạng thái hệ thống</span>
+        <span class="status-value">{{ stats.is_running ? 'Đang chạy quét deal...' : 'Sẵn sàng (Idle)' }}</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+      <button class="nav-item" [class.active]="activeTab === 'dashboard'" (click)="switchTab('dashboard')">
+        <span class="icon">📊</span>
+        <span>Thống Kê Tổng Quan</span>
+      </button>
+
+      <button class="nav-item" [class.active]="activeTab === 'schedule'" (click)="switchTab('schedule')">
+        <span class="icon">⏰</span>
+        <span>Lịch Chạy Hàng Ngày</span>
+        <span class="badge badge-accent">{{ schedule.enabled ? schedule.time : 'Tắt' }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="activeTab === 'deals'" (click)="switchTab('deals')">
+        <span class="icon">🛍️</span>
+        <span>Sản Phẩm Đã Săn</span>
+        <span class="badge" *ngIf="stats.deals_today > 0">{{ stats.deals_today }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="activeTab === 'groups'" (click)="switchTab('groups')">
+        <span class="icon">👥</span>
+        <span>Nhóm Facebook</span>
+        <span class="badge badge-accent" *ngIf="stats.groups_total > 0">{{ stats.groups_total }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="activeTab === 'settings'" (click)="switchTab('settings')">
+        <span class="icon">⚙️</span>
+        <span>Tài Khoản & Cấu Hình</span>
+      </button>
+
+      <button class="nav-item" [class.active]="activeTab === 'logs'" (click)="switchTab('logs')">
+        <span class="icon">📜</span>
+        <span>Xem Nhật Ký (Live)</span>
+      </button>
+    </nav>
+
+    <!-- Trigger Action Button -->
+    <div class="sidebar-footer">
+      <button class="btn-run" [disabled]="stats.is_running" (click)="runWorkflowNow()">
+        <span *ngIf="!stats.is_running">▶ Kích Hoạt Chạy Ngay</span>
+        <span *ngIf="stats.is_running">⏳ Đang xử lý...</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content View -->
+  <main class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+      <div class="page-title">
+        <h1 *ngIf="activeTab === 'dashboard'">Bảng Điều Khiển & Thống Kê</h1>
+        <h1 *ngIf="activeTab === 'schedule'">Cấu Hình Lịch Chạy Tự Động Hàng Ngày</h1>
+        <h1 *ngIf="activeTab === 'deals'">Danh Sách Top Deal Đã Lọc Hôm Nay</h1>
+        <h1 *ngIf="activeTab === 'groups'">Quản Lý Group Facebook Dò Tìm Được</h1>
+        <h1 *ngIf="activeTab === 'settings'">Cấu Hình Tài Khoản & Tiêu Chí Lọc</h1>
+        <h1 *ngIf="activeTab === 'logs'">Nhật Ký Thực Thi Hệ Thống (Real-Time)</h1>
+        <p class="subtitle">Hệ thống tự động hóa săn deal Shopee và mở rộng cộng đồng Facebook (Dữ liệu thật 100%)</p>
+      </div>
+
+      <div class="header-actions">
+        <span class="time-stamp" *ngIf="stats.last_run">Lần chạy cuối: {{ stats.last_run }}</span>
+        <button class="btn-refresh" (click)="fetchStats(); fetchHealth()">🔄 Làm Mới</button>
+      </div>
+    </header>
+
+    <!-- TAB 1: DASHBOARD -->
+    <section class="content-body" *ngIf="activeTab === 'dashboard'">
+      <!-- Missing Config Alert (Báo lỗi thật, không fake dữ liệu) -->
+      <div class="alert-box warning-card glass-card" *ngIf="!health.ready">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+          <h4>Phát hiện cấu hình chưa hoàn thiện!</h4>
+          <p>Hệ thống không sử dụng dữ liệu giả lập. Bạn cần cấu hình các mục sau để các tác vụ chạy thật 100%:</p>
+          <ul class="issue-list">
+            <li *ngFor="let issue of health.issues">• {{ issue }}</li>
+          </ul>
+        </div>
+        <button class="btn-fix" (click)="switchTab('settings')">Cấu Hình Ngay →</button>
+      </div>
+
+      <!-- Last Run Error Alert -->
+      <div class="alert-box danger-card glass-card" *ngIf="stats.last_error">
+        <div class="alert-icon">❌</div>
+        <div class="alert-content">
+          <h4>Lỗi trong lần chạy vừa qua:</h4>
+          <p class="error-msg">{{ stats.last_error }}</p>
+        </div>
+        <button class="btn-fix" (click)="switchTab('logs')">Xem Log Chi Tiết →</button>
+      </div>
+
+      <!-- Stats Cards Grid -->
+      <div class="stats-grid">
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Ngành Hàng Theo Dõi</span>
+            <span class="stat-icon purple">📦</span>
+          </div>
+          <div class="stat-number">{{ stats.categories_count }}</div>
+          <span class="stat-desc">Danh mục thật từ Shopee</span>
+        </div>
+
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Deals Săn Hôm Nay</span>
+            <span class="stat-icon emerald">🔥</span>
+          </div>
+          <div class="stat-number">{{ stats.deals_today }}</div>
+          <span class="stat-desc">Tổng số deal đã lưu: {{ stats.deals_total }}</span>
+        </div>
+
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Group Facebook Dò Được</span>
+            <span class="stat-icon blue">👥</span>
+          </div>
+          <div class="stat-number">{{ stats.groups_total }}</div>
+          <span class="stat-desc">Thành viên $\ge$ 10.000</span>
+        </div>
+
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Lịch Chạy Hàng Ngày</span>
+            <span class="stat-icon amber">⏰</span>
+          </div>
+          <div class="stat-number font-time">{{ schedule.enabled ? schedule.time : 'Tắt' }}</div>
+          <span class="stat-desc">{{ schedule.enabled ? 'Tự động quét mỗi ngày' : 'Chưa bật lịch chạy' }}</span>
+        </div>
+      </div>
+
+      <!-- Quick Action Banner -->
+      <div class="action-banner glass-card">
+        <div class="banner-content">
+          <h3>Sẵn sàng quét deal và đẩy bài tự động?</h3>
+          <p>Hệ thống sẽ lấy dữ liệu thật từ Shopee, tính điểm deal, bắn vào kênh Telegram và dò tìm group Facebook theo đúng ngành hàng.</p>
+        </div>
+        <button class="btn-primary" [disabled]="stats.is_running" (click)="runWorkflowNow()">
+          {{ stats.is_running ? 'Đang Chạy Quét...' : 'Bắt Đầu Quét Ngay' }}
+        </button>
+      </div>
+
+      <!-- Recent Deals Preview -->
+      <div class="section-container glass-card">
+        <div class="section-header">
+          <h3>Deals Mới Nhất Vừa Quét</h3>
+          <button class="btn-link" (click)="switchTab('deals')">Xem tất cả →</button>
+        </div>
+        <div class="deals-mini-list" *ngIf="deals.length > 0; else noDeals">
+          <div class="deal-row" *ngFor="let d of deals.slice(0, 5)">
+            <div class="deal-info">
+              <span class="deal-badge">{{ d.category_name }}</span>
+              <h4 class="deal-name">{{ d.name }}</h4>
+            </div>
+            <div class="deal-pricing">
+              <span class="price-sale">{{ d.price_sale | number }}đ</span>
+              <span class="discount-tag">-{{ d.discount_percent }}%</span>
+            </div>
+            <a [href]="d.aff_url || d.item_url" target="_blank" class="btn-view">Link Aff ↗</a>
+          </div>
+        </div>
+        <ng-template #noDeals>
+          <div class="empty-state">Chưa có deal nào trong kho dữ liệu. Hãy cấu hình tài khoản và bấm "Bắt Đầu Quét Ngay"!</div>
+        </ng-template>
+      </div>
+    </section>
+
+    <!-- TAB: SCHEDULER (LỊCH CHẠY HÀNG NGÀY) -->
+    <section class="content-body" *ngIf="activeTab === 'schedule'">
+      <div class="schedule-container glass-card">
+        <div class="schedule-header">
+          <div class="schedule-icon">⏰</div>
+          <div>
+            <h3>Bộ Hẹn Giờ Tự Động Chạy Mỗi Ngày (Cronjob)</h3>
+            <p>Hệ thống sẽ tự động thức dậy vào khung giờ bạn chỉ định để cào deal và đăng bài mà không cần bạn phải thao tác bằng tay.</p>
+          </div>
+        </div>
+
+        <div class="schedule-form">
+          <div class="form-group toggle-group">
+            <label class="switch-label">
+              <input type="checkbox" [(ngModel)]="schedule.enabled">
+              <span class="slider"></span>
+              <strong>Bật Lịch Chạy Hàng Ngày Tự Động</strong>
+            </label>
+            <small>Khi bật, bot ngầm sẽ tự động quét deal và gửi bài đúng giờ mỗi ngày</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Giờ chạy hàng ngày (Định dạng HH:MM):</label>
+              <input type="time" [(ngModel)]="schedule.time" class="time-input">
+              <small>Khuyên dùng: 08:00 (Sáng) hoặc 19:30 (Tối) khi lượng mua hàng cao nhất</small>
+            </div>
+
+            <div class="form-group">
+              <label>Số lượng ngành hàng cần quét mỗi lần:</label>
+              <input type="number" min="1" max="10" [(ngModel)]="schedule.cats">
+              <small>Mỗi ngành sẽ lấy Top 3 deal hời nhất (VD: 3 ngành = 9 deal/ngày)</small>
+            </div>
+          </div>
+
+          <div class="schedule-info-box">
+            <span>Trạng thái hiện tại:</span>
+            <strong>{{ schedule.enabled ? ('Đã lên lịch chạy vào lúc ' + schedule.time + ' hàng ngày') : 'Đang tạm tắt lịch chạy tự động' }}</strong>
+          </div>
+
+          <div class="schedule-actions">
+            <button class="btn-save" (click)="saveSchedule()">💾 Lưu Cài Đặt Lịch Chạy</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: DEALS LIST -->
+    <section class="content-body" *ngIf="activeTab === 'deals'">
+      <div class="deals-grid" *ngIf="deals.length > 0; else emptyDeals">
+        <div class="deal-card glass-card" *ngFor="let deal of deals">
+          <div class="deal-badge-strip">
+            <span class="cat-pill">{{ deal.category_name }}</span>
+            <span class="discount-pill">-{{ deal.discount_percent }}%</span>
+          </div>
+          <h3 class="deal-title" [title]="deal.name">{{ deal.name }}</h3>
+          
+          <div class="deal-meta">
+            <span>⭐ {{ deal.rating_star }}</span>
+            <span>Đã bán: {{ deal.historical_sold | number }}</span>
+            <span class="score-tag">Điểm: {{ deal.deal_score }}</span>
+          </div>
+
+          <div class="deal-footer">
+            <div class="price-box">
+              <div class="price-current">{{ deal.price_sale | number }}đ</div>
+              <div class="price-old">{{ deal.price_original | number }}đ</div>
+            </div>
+            <a [href]="deal.aff_url || deal.item_url" target="_blank" class="btn-buy">
+              Mua Ngay ↗
+            </a>
+          </div>
+        </div>
+      </div>
+      <ng-template #emptyDeals>
+        <div class="glass-card empty-card">
+          <p>Chưa có sản phẩm nào được lưu trữ. Hãy kích hoạt chạy chu trình quét deal!</p>
+        </div>
+      </ng-template>
+    </section>
+
+    <!-- TAB: GROUPS OUTREACH -->
+    <section class="content-body" *ngIf="activeTab === 'groups'">
+      <div class="glass-card table-container">
+        <table class="custom-table" *ngIf="groups.length > 0; else emptyGroups">
+          <thead>
+            <tr>
+              <th>Tên Group Facebook</th>
+              <th>Ngành Hàng</th>
+              <th>Thành Viên</th>
+              <th>Trạng Thái</th>
+              <th>Hành Động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let g of groups">
+              <td class="font-medium">{{ g.name }}</td>
+              <td><span class="tag-pill">{{ g.category_name }}</span></td>
+              <td><strong>{{ g.members_count | number }}</strong></td>
+              <td>
+                <span class="status-pill" [ngClass]="g.status.toLowerCase()">
+                  {{ g.status === 'PENDING' ? 'Chờ Duyệt' : (g.status === 'APPROVED' ? 'Đã Tham Gia' : 'Mới Tìm Thấy') }}
+                </span>
+              </td>
+              <td>
+                <a [href]="g.url" target="_blank" class="btn-table-link">Mở Link ↗</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <ng-template #emptyGroups>
+          <div class="empty-card">Chưa có group nào được tìm kiếm. Kích hoạt chạy chu trình để dò tìm tự động!</div>
+        </ng-template>
+      </div>
+    </section>
+
+    <!-- TAB: SETTINGS & ACCOUNTS -->
+    <section class="content-body" *ngIf="activeTab === 'settings'">
+      <div class="settings-grid">
+        <!-- 1. Cấu hình Tài khoản Facebook -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">📘</span>
+            <h3>1. Tài Khoản Facebook (Outreach)</h3>
+          </div>
+          <p class="card-desc">Cấu hình Profile Chrome hoặc Cookie để bot mở trình duyệt tìm group và gửi câu hỏi duyệt nhóm.</p>
+          
+          <div class="form-group">
+            <label>Đường dẫn Chrome User Data Profile:</label>
+            <input type="text" [(ngModel)]="config.fb_chrome_profile_path" placeholder="C:\Users\username\AppData\Local\Google\Chrome\User Data">
+            <small>Khuyên dùng: Dùng profile Chrome đã đăng nhập sẵn nick của bạn để không cần gõ mật khẩu</small>
+          </div>
+
+          <div class="form-group">
+            <label>Chuỗi Cookie Facebook (Nếu không dùng Profile):</label>
+            <textarea rows="3" [(ngModel)]="config.fb_account_cookie" placeholder="c_user=...; xs=...; sb=..."></textarea>
+          </div>
+        </div>
+
+        <!-- 2. Cấu hình Shopee & Affiliate -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🛒</span>
+            <h3>2. Shopee Affiliate & Cookie</h3>
+          </div>
+          <p class="card-desc">Cần có ít nhất 1 trong 2: Cookie Shopee hoặc Shopee Open API để tránh bị sàn chặn 403.</p>
+
+          <div class="form-group">
+            <label>Shopee Cookie (Dễ nhất - Copy từ trình duyệt Chrome):</label>
+            <textarea rows="2" [(ngModel)]="config.shopee_cookie" placeholder="SPC_F=...; SPC_SI=...; SPC_U=..."></textarea>
+            <small>F12 trên shopee.vn $\rightarrow$ Network $\rightarrow$ Copy Header 'Cookie' dán vào đây</small>
+          </div>
+
+          <div class="form-group">
+            <label>Shopee App ID (Nếu dùng Open API chính thức):</label>
+            <input type="text" [(ngModel)]="config.shopee_app_id" placeholder="VD: 18000000001">
+          </div>
+
+          <div class="form-group">
+            <label>Shopee Secret Key:</label>
+            <input type="password" [(ngModel)]="config.shopee_secret" placeholder="Mã bí mật từ affiliate.shopee.vn">
+          </div>
+
+          <div class="test-btn-box">
+            <button class="btn-test" [disabled]="testingShopee" (click)="testShopeeConnection()">
+              {{ testingShopee ? '⏳ Đang kiểm tra kết nối...' : '🧪 Kiểm Tra Kết Nối Shopee' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Cấu hình Kênh Nhà (Telegram) -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">✈️</span>
+            <h3>3. Kênh Nhà (Telegram Bot)</h3>
+          </div>
+          <p class="card-desc">Bắn deal hot tự động vào Kênh/Group Telegram của bạn ngay khi vừa săn được.</p>
+
+          <div class="form-group">
+            <label>Telegram Bot Token:</label>
+            <input type="text" [(ngModel)]="config.telegram_bot_token" placeholder="VD: 7123456789:AAHxxxx...">
+            <small>Tạo miễn phí qua bot &#64;BotFather trên Telegram</small>
+          </div>
+
+          <div class="form-group">
+            <label>Telegram Chat ID / Channel Username:</label>
+            <input type="text" [(ngModel)]="config.telegram_chat_id" placeholder="@kenh_san_deal_shopee hoặc -100xxxx">
+          </div>
+
+          <div class="test-btn-box">
+            <button class="btn-test" [disabled]="testingTelegram" (click)="testTelegramConnection()">
+              {{ testingTelegram ? '⏳ Đang gửi tin nhắn test...' : '🧪 Gửi Thử Tin Nhắn Vào Telegram' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Tiêu chuẩn lọc Deal & Giới hạn an toàn -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🛡️</span>
+            <h3>4. Tiêu Chuẩn Lọc & Hạn Mức An Toàn</h3>
+          </div>
+          <p class="card-desc">Điều chỉnh các ngưỡng thuật toán để chọn ra sản phẩm chất lượng nhất.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Đánh giá tối thiểu (Sao):</label>
+              <input type="number" step="0.1" [(ngModel)]="config.min_rating_star">
+            </div>
+
+            <div class="form-group">
+              <label>Lượt bán tối thiểu:</label>
+              <input type="number" [(ngModel)]="config.min_historical_sold">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>% Giảm giá tối thiểu:</label>
+              <input type="number" [(ngModel)]="config.min_discount_percent">
+            </div>
+
+            <div class="form-group">
+              <label>Số group Join tối đa/ngày:</label>
+              <input type="number" [(ngModel)]="config.max_groups_per_day">
+              <small>Khuyên dùng: 3 group/ngày để bảo vệ tài khoản</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <div class="settings-action-bar">
+        <button class="btn-save" (click)="saveConfig()">💾 Lưu Cấu Hình Hệ Thống</button>
+      </div>
+    </section>
+
+    <!-- TAB: LIVE LOGS -->
+    <section class="content-body" *ngIf="activeTab === 'logs'">
+      <div class="log-viewer glass-card">
+        <div class="log-toolbar">
+          <div class="toolbar-left">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">automation.log — Live Output Stream</span>
+          </div>
+          <div class="toolbar-right">
+            <label class="toggle-label">
+              <input type="checkbox" [(ngModel)]="autoRefreshLogs"> Tự động cuộn & làm mới (4s)
+            </label>
+            <button class="btn-small" (click)="fetchLogs()">🔄 Đọc Lại</button>
+            <button class="btn-small danger" (click)="clearLogs()">🗑️ Xóa Log</button>
+          </div>
+        </div>
+
+        <pre class="terminal-window"><code>{{ logsContent }}</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="toast" *ngIf="showToast" [ngClass]="toastType">
+    <span class="toast-icon">ℹ️</span>
+    <span class="toast-text">{{ toastMessage }}</span>
+  </div>
+</div>

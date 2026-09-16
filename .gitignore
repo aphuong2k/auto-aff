@@ -1,0 +1,45 @@
+# ====================================
+# Python Backend
+# ====================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Secret & Environment files
+.env
+.env.*
+!.env.example
+
+# Databases & Local data
+data/*.db
+data/*.sqlite3
+*.db
+
+# Logs
+logs/*.log
+*.log
+
+# ====================================
+# Angular Frontend
+# ====================================
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+frontend/.cache/
+frontend/tmp/
+
+# ====================================
+# IDE & System files
+# ====================================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
