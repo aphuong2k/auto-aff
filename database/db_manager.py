@@ -165,3 +165,28 @@ class DatabaseManager:
                 UPDATE fb_groups SET status = ? WHERE group_id = ?
             """, (status, group_id))
             conn.commit()
+
+    # --- Clean-up Operations ---
+    def clear_deals(self):
+        """Xóa toàn bộ sản phẩm deal đã lưu trữ"""
+        with self.get_connection() as conn:
+            conn.execute("DELETE FROM post_history")
+            conn.execute("DELETE FROM deals")
+            conn.commit()
+
+    def clear_groups(self):
+        """Xóa toàn bộ nhóm Facebook đã dò tìm"""
+        with self.get_connection() as conn:
+            conn.execute("DELETE FROM fb_groups")
+            conn.commit()
+
+    def reset_all_data(self, keep_categories: bool = True):
+        """Xóa sạch dữ liệu sản phẩm, nhóm ảo và lịch sử"""
+        with self.get_connection() as conn:
+            conn.execute("DELETE FROM post_history")
+            conn.execute("DELETE FROM deals")
+            conn.execute("DELETE FROM fb_groups")
+            if not keep_categories:
+                conn.execute("DELETE FROM categories")
+            conn.commit()
+            conn.execute("VACUUM")

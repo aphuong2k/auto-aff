@@ -304,6 +304,40 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  clearDeals(): void {
+    this.http.post(`${this.apiUrl}/deals/clear`, {}).subscribe({
+      next: (res: any) => {
+        this.deals = [];
+        this.fetchStats();
+        this.triggerToast(res.message || 'Đã xóa toàn bộ sản phẩm!', 'info');
+      },
+      error: (err) => this.triggerToast('Lỗi xóa sản phẩm: ' + err.message, 'error')
+    });
+  }
+
+  clearGroups(): void {
+    this.http.post(`${this.apiUrl}/groups/clear`, {}).subscribe({
+      next: (res: any) => {
+        this.groups = [];
+        this.fetchStats();
+        this.triggerToast(res.message || 'Đã xóa toàn bộ nhóm Facebook!', 'info');
+      },
+      error: (err) => this.triggerToast('Lỗi xóa nhóm: ' + err.message, 'error')
+    });
+  }
+
+  resetAllData(): void {
+    this.http.post(`${this.apiUrl}/data/reset`, {}).subscribe({
+      next: (res: any) => {
+        this.deals = [];
+        this.groups = [];
+        this.fetchStats();
+        this.triggerToast(res.message || 'Đã làm sạch toàn bộ dữ liệu sản phẩm & nhóm ảo!', 'info');
+      },
+      error: (err) => this.triggerToast('Lỗi dọn dẹp dữ liệu: ' + err.message, 'error')
+    });
+  }
+
   triggerToast(msg: string, type: 'success' | 'error' | 'info' = 'info'): void {
     this.toastMessage = msg;
     this.toastType = type;

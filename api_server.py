@@ -198,6 +198,21 @@ def get_groups():
         """).fetchall()
         return [dict(r) for r in rows]
 
+@app.post("/api/deals/clear")
+def clear_deals():
+    db.clear_deals()
+    return {"status": "SUCCESS", "message": "Đã xóa toàn bộ dữ liệu deal sản phẩm!"}
+
+@app.post("/api/groups/clear")
+def clear_groups():
+    db.clear_groups()
+    return {"status": "SUCCESS", "message": "Đã xóa toàn bộ dữ liệu nhóm Facebook!"}
+
+@app.post("/api/data/reset")
+def reset_all_data():
+    db.reset_all_data(keep_categories=True)
+    return {"status": "SUCCESS", "message": "Đã làm sạch toàn bộ dữ liệu sản phẩm và nhóm Facebook!"}
+
 @app.get("/api/config")
 def get_config():
     load_env_vars()

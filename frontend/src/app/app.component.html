@@ -80,6 +80,7 @@
       <div class="header-actions">
         <span class="time-stamp" *ngIf="stats.last_run">Lần chạy cuối: {{ stats.last_run }}</span>
         <button class="btn-refresh" (click)="fetchStats(); fetchHealth()">🔄 Làm Mới</button>
+        <button class="btn-clear-top" (click)="resetAllData()" title="Xóa sạch toàn bộ sản phẩm và nhóm ảo">🧹 Xóa Dữ Liệu Ảo</button>
       </div>
     </header>
 
@@ -232,6 +233,11 @@
 
     <!-- TAB: DEALS LIST -->
     <section class="content-body" *ngIf="activeTab === 'deals'">
+      <div class="tab-toolbar" *ngIf="deals.length > 0">
+        <span class="toolbar-info">Tổng cộng <strong>{{ deals.length }}</strong> sản phẩm deal</span>
+        <button class="btn-clear-table" (click)="clearDeals()">🗑️ Xóa Toàn Bộ Sản Phẩm</button>
+      </div>
+
       <div class="deals-grid" *ngIf="deals.length > 0; else emptyDeals">
         <div class="deal-card glass-card" *ngFor="let deal of deals">
           <div class="deal-badge-strip">
@@ -266,6 +272,11 @@
 
     <!-- TAB: GROUPS OUTREACH -->
     <section class="content-body" *ngIf="activeTab === 'groups'">
+      <div class="tab-toolbar" *ngIf="groups.length > 0">
+        <span class="toolbar-info">Tổng cộng <strong>{{ groups.length }}</strong> nhóm Facebook</span>
+        <button class="btn-clear-table" (click)="clearGroups()">🗑️ Xóa Toàn Bộ Nhóm</button>
+      </div>
+
       <div class="glass-card table-container">
         <table class="custom-table" *ngIf="groups.length > 0; else emptyGroups">
           <thead>
