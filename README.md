@@ -57,7 +57,34 @@ SHOPEE_SECRET="your_shopee_secret"
 ```
 *(Nếu chưa điền token, hệ thống sẽ tự động chạy ở chế độ mô phỏng an toàn để bạn kiểm tra luồng dữ liệu).*
 
-### 3. Chạy thử nghiệm ngay:
+### 3. Khởi chạy hệ thống:
+
+#### Cách 1: Chạy trọn gói Web Dashboard (Cả Backend & Frontend trên 1 cổng)
+Frontend Angular đã được build sẵn vào thư mục `frontend/dist`. FastAPI sẽ tự động phục vụ cả giao diện Web lẫn API:
+```bash
+python api_server.py
+```
+👉 Mở trình duyệt truy cập: **`http://localhost:8000`**
+
+---
+
+#### Cách 2: Chạy riêng biệt (Dành cho lập trình viên sửa code Frontend)
+- **Terminal 1 (Backend FastAPI)**:
+  ```bash
+  python api_server.py
+  # Hoặc chế độ tự reload khi sửa code:
+  uvicorn api_server:app --reload --port 8000
+  ```
+- **Terminal 2 (Frontend Angular Live-Reload)**:
+  ```bash
+  cd frontend
+  npm start
+  ```
+👉 Mở trình duyệt truy cập: **`http://localhost:4200`** (giao diện sẽ tự động gọi API tới `http://localhost:8000/api`)
+
+---
+
+#### Cách 3: Chạy trực tiếp qua dòng lệnh (CLI - không cần Web UI)
 ```bash
 python main.py --once --cats 3
 ```

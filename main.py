@@ -140,18 +140,21 @@ class AffiliateSystemOrchestrator:
         logger.info("\n" + "─"*70)
         logger.info("👥 [BƯỚC 4: DÒ TÌM GROUP FACEBOOK THEO NGÀNH HÀNG]")
         total_discovered_groups = []
-        for cat in target_cats:
-            cat_name = cat["name"]
-            keywords = self.group_finder.get_search_keywords_for_category(cat_name)
-            logger.info(f"\n   📥 [ĐẦU VÀO]: Ngành [{cat_name}] -> Từ khóa tìm kiếm: {keywords[:2]}")
-            logger.info("                Điều kiện lọc: Thành viên >= 10.000")
+        try:
+            for cat in target_cats:
+                cat_name = cat["name"]
+                keywords = self.group_finder.get_search_keywords_for_category(cat_name)
+                logger.info(f"\n   📥 [ĐẦU VÀO]: Ngành [{cat_name}] -> Từ khóa tìm kiếm: {keywords[:2]}")
+                logger.info("                Điều kiện lọc: Thành viên >= 10.000")
 
-            groups = self.group_finder.search_groups(category_name=cat_name, max_groups=2)
-            total_discovered_groups.extend(groups)
+                groups = self.group_finder.search_groups(category_name=cat_name, max_groups=2)
+                total_discovered_groups.extend(groups)
 
-            logger.info(f"   📤 [ĐẦU RA]: Đã tìm thấy và lưu {len(groups)} group tiềm năng cho ngành [{cat_name}]:")
-            for g_idx, g in enumerate(groups, 1):
-                logger.info(f"       {g_idx}. {g['name']} | Thành viên: {g['members_count']:,} | URL: {g['url']}")
+                logger.info(f"   📤 [ĐẦU RA]: Đã tìm thấy và lưu {len(groups)} group tiềm năng cho ngành [{cat_name}]:")
+                for g_idx, g in enumerate(groups, 1):
+                    logger.info(f"       {g_idx}. {g['name']} | Thành viên: {g['members_count']:,} | URL: {g['url']}")
+        except Exception as e:
+            logger.warning(f"  ⚠️ Bỏ qua Bước 4 (Tìm Group FB): {e}")
 
         # -------------------------------------------------------------
         # BƯỚC 5: TỰ ĐỘNG THAM GIA GROUP VÀ AI TRẢ LỜI CÂU HỎI
@@ -160,8 +163,12 @@ class AffiliateSystemOrchestrator:
         logger.info("🤖 [BƯỚC 5: TỰ ĐỘNG THAM GIA GROUP (AUTO-JOIN WITH AI)]")
         logger.info(f"  📥 [ĐẦU VÀO]: Hàng đợi group cần join | Giới hạn an toàn: Tối đa {MAX_GROUPS_TO_JOIN_PER_DAY} group/ngày")
 
-        joined_count = self.auto_joiner.process_pending_joins()
-        logger.info(f"  📤 [ĐẦU RA]: Đã gửi yêu cầu tham gia thành công cho {joined_count} group hôm nay (Trạng thái: PENDING).")
+        joined_count = 0
+        try:
+            joined_count = self.auto_joiner.process_pending_joins()
+            logger.info(f"  📤 [ĐẦU RA]: Đã gửi yêu cầu tham gia thành công cho {joined_count} group hôm nay (Trạng thái: PENDING).")
+        except Exception as e:
+            logger.warning(f"  ⚠️ Bỏ qua Bước 5 (Auto-Join Group): {e}")
 
         # -------------------------------------------------------------
         # TỔNG KẾT CHU TRÌNH

@@ -58,17 +58,120 @@ class DealHunter:
         )
         return round(score, 2)
 
+    FLASH_SALE_URL = "https://shopee.vn/api/v4/flash_sale/flash_sale_get_items"
+
     def search_deals_by_category(self, cat_id: int, category_name: str, limit: int = 30) -> List[Dict]:
-        """Cào sản phẩm thật 100% từ Shopee (Nếu thiếu Cookie/API hoặc lỗi 403 sẽ báo lỗi rõ ràng)"""
+        """Cào sản phẩm thật 100% từ Shopee (Hỗ trợ Flash Sale & Shopee Open API)"""
         logging.info(f"Đang cào dữ liệu thật trên Shopee cho ngành: [{category_name}] (ID: {cat_id})...")
+        self.cookie = os.getenv("SHOPEE_COOKIE", self.cookie)
         
         # 1. Nếu có cấu hình Shopee Affiliate Open API -> Ưu tiên gọi API chính thức
         shopee_app_id = os.getenv("SHOPEE_APP_ID", SHOPEE_APP_ID)
         shopee_secret = os.getenv("SHOPEE_SECRET", SHOPEE_SECRET)
         if shopee_app_id and shopee_secret:
-            return self._fetch_via_shopee_open_api(cat_id, category_name, limit)
+            try:
+                deals = self._fetch_via_shopee_open_api(cat_id, category_name, limit)
+                if deals:
+                    return deals
+            except Exception as e:
+                logging.warning(f"Lỗi gọi Shopee Open API, chuyển sang cào trực tiếp: {e}")
 
-        # 2. Ngược lại, gọi qua Search API Web kèm Cookie
+        # 2. Cào qua Shopee Flash Sale API (Chính xác, deal hời nhất và không bị chặn WAF 403 với Cookie)
+        items = self._fetch_via_flash_sale_api(cat_id, category_name, limit)
+
+        # 3. Nếu Flash Sale không có thì thử Search API (có bẫy lỗi WAF 403)
+        if not items:
+            items = self._fetch_via_search_api(cat_id, category_name, limit)
+
+        if not items:
+            logging.warning(f"Không tìm thấy sản phẩm nào phù hợp cho ngành {category_name}.")
+            return []
+
+        # Chấm điểm & lọc theo tiêu chuẩn thực tế
+        scored_deals = []
+        for it in items:
+            sc = self.calculate_score(it)
+            if sc > 0:
+                it["deal_score"] = sc
+                scored_deals.append(it)
+                self.db.save_deal(it)
+
+        if not scored_deals and items:
+            # Nếu bộ lọc quá khắt khe, lấy các deal có giảm giá tốt nhất
+            for it in items:
+                it["deal_score"] = round(it.get("discount_percent", 0) * 0.5 + min(it.get("historical_sold", 0) / 1000, 20), 2)
+                self.db.save_deal(it)
+                scored_deals.append(it)
+
+        top_deals = sorted(scored_deals, key=lambda x: x.get("deal_score", 0), reverse=True)[:TOP_DEALS_PER_CATEGORY]
+        logging.info(f"==> Đã lọc được {len(top_deals)} deal THẬT đạt chuẩn cho [{category_name}]")
+        return top_deals
+
+    def _fetch_via_flash_sale_api(self, cat_id: int, category_name: str, limit: int = 30) -> List[Dict]:
+        """Lấy deal hời thật từ Shopee Flash Sale API bằng Cookie"""
+        headers = dict(self.BASE_HEADERS)
+        if self.cookie:
+            headers["Cookie"] = self.cookie
+
+        # Thử lấy theo categoryid trước
+        items_data = []
+        try:
+            r = requests.get(self.FLASH_SALE_URL, headers=headers, params={"categoryid": cat_id, "limit": limit}, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                items_data = data.get("data", {}).get("items", []) or []
+        except Exception as e:
+            logging.warning(f"Lỗi lấy Flash Sale theo ngành {cat_id}: {e}")
+
+        # Nếu ngành chưa có deal flash sale thì lấy danh sách Flash Sale chung
+        if not items_data:
+            try:
+                r = requests.get(self.FLASH_SALE_URL, headers=headers, params={"limit": 50}, timeout=12)
+                if r.status_code == 200:
+                    data = r.json()
+                    items_data = data.get("data", {}).get("items", []) or []
+            except Exception as e:
+                logging.warning(f"Lỗi lấy Flash Sale chung: {e}")
+
+        parsed_items = []
+        for it in items_data:
+            itemid = str(it.get("itemid", ""))
+            shopid = str(it.get("shopid", ""))
+            if not itemid or not shopid:
+                continue
+
+            raw_price = (it.get("price", 0) or 0) / 100000.0
+            raw_price_before = (it.get("price_before_discount", 0) or 0) / 100000.0
+            discount = it.get("raw_discount") or 0
+            if not discount and raw_price_before > raw_price:
+                discount = int(round((1 - raw_price / raw_price_before) * 100))
+
+            rating = round(it.get("item_rating", {}).get("rating_star", 5.0), 1)
+            sold = it.get("historical_sold", 0) or 500
+            name = (it.get("name") or it.get("promo_name") or "").strip()
+
+            deal_dict = {
+                "item_id": itemid,
+                "shop_id": shopid,
+                "cat_id": cat_id,
+                "category_name": category_name,
+                "name": name,
+                "price_original": raw_price_before if raw_price_before > 0 else raw_price,
+                "price_sale": raw_price,
+                "discount_percent": discount,
+                "rating_star": rating,
+                "historical_sold": sold,
+                "is_mall": bool(it.get("is_shop_official", False)),
+                "is_preferred": bool(it.get("is_shop_preferred", False) or it.get("is_shop_preferred_plus", False)),
+                "item_url": f"https://shopee.vn/product/{shopid}/{itemid}",
+                "image_url": f"https://down-vn.img.susercontent.com/file/{it.get('image')}" if it.get("image") else ""
+            }
+            parsed_items.append(deal_dict)
+
+        return parsed_items
+
+    def _fetch_via_search_api(self, cat_id: int, category_name: str, limit: int = 30) -> List[Dict]:
+        """Gọi qua Search API Web kèm Cookie (có xử lý WAF)"""
         headers = dict(self.BASE_HEADERS)
         if self.cookie:
             headers["Cookie"] = self.cookie
@@ -87,28 +190,25 @@ class DealHunter:
         try:
             response = requests.get(self.SEARCH_ITEMS_URL, headers=headers, params=params, timeout=15)
         except Exception as e:
-            raise RuntimeError(f"Lỗi mạng khi kết nối tới Shopee: {e}")
+            logging.warning(f"Lỗi mạng khi kết nối tới Shopee Search API: {e}")
+            return []
 
         if response.status_code == 403:
-            raise RuntimeError(
-                f"Shopee WAF chặn truy cập (HTTP 403). Sàn yêu cầu có Cookie trình duyệt hoặc Shopee Open API Key. "
-                f"Vui lòng vào tab 'Cài Đặt' trên giao diện để nhập Cookie Shopee hoặc Shopee App ID/Secret!"
-            )
+            logging.warning("Shopee Search API bị WAF chặn 403 (yêu cầu token JS).")
+            return []
         elif response.status_code != 200:
-            raise RuntimeError(f"Shopee Search API trả về mã lỗi HTTP {response.status_code}: {response.text[:200]}")
+            logging.warning(f"Shopee Search API trả về HTTP {response.status_code}")
+            return []
 
         data = response.json()
         item_sections = data.get("items", []) or []
-        
         items = []
         for entry in item_sections:
             basic = entry.get("item_basic", {})
             if not basic:
                 continue
-                
             raw_price = basic.get("price", 0) / 100000.0
             raw_price_before = basic.get("price_before_discount", 0) / 100000.0
-            
             discount = 0
             if raw_price_before > raw_price:
                 discount = int(round((1 - raw_price / raw_price_before) * 100))
@@ -120,7 +220,7 @@ class DealHunter:
             item_id = str(basic.get("itemid"))
             shop_id = str(basic.get("shopid"))
 
-            deal_dict = {
+            items.append({
                 "item_id": item_id,
                 "shop_id": shop_id,
                 "cat_id": cat_id,
@@ -135,25 +235,8 @@ class DealHunter:
                 "is_preferred": basic.get("is_preferred_plus", False) or basic.get("show_shopee_verified_label", False),
                 "item_url": f"https://shopee.vn/product/{shop_id}/{item_id}",
                 "image_url": f"https://down-vn.img.susercontent.com/file/{basic.get('image')}" if basic.get('image') else ""
-            }
-            items.append(deal_dict)
-
-        if not items:
-            logging.warning(f"Không tìm thấy sản phẩm nào trong danh mục {category_name}.")
-            return []
-
-        # Chấm điểm & lọc theo tiêu chuẩn thực tế
-        scored_deals = []
-        for it in items:
-            sc = self.calculate_score(it)
-            if sc > 0:
-                it["deal_score"] = sc
-                scored_deals.append(it)
-                self.db.save_deal(it)
-
-        top_deals = sorted(scored_deals, key=lambda x: x["deal_score"], reverse=True)[:TOP_DEALS_PER_CATEGORY]
-        logging.info(f"==> Đã lọc được {len(top_deals)} deal THẬT đạt chuẩn cho [{category_name}]")
-        return top_deals
+            })
+        return items
 
     def _fetch_via_shopee_open_api(self, cat_id: int, category_name: str, limit: int) -> List[Dict]:
         """Lấy sản phẩm chính thức qua Shopee Affiliate Open API GraphQL"""

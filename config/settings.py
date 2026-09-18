@@ -4,6 +4,16 @@ from pathlib import Path
 # Thư mục gốc dự án
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Nạp .env bằng thuần Python không phụ thuộc thư viện ngoài
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    with open(_env_file, "r", encoding="utf-8") as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                os.environ[_k.strip()] = _v.strip().strip('"')
+
 # Thư mục dữ liệu & Log
 DATA_DIR = BASE_DIR / "data"
 LOG_DIR = BASE_DIR / "logs"

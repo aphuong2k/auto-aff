@@ -17,12 +17,16 @@ class TelegramPublisher:
         self.db = db or DatabaseManager()
 
     def publish_deal(self, deal: Dict) -> bool:
-        """Gửi deal thật tới Telegram (Nếu chưa cấu hình Token sẽ báo lỗi rõ ràng)"""
+        """Gửi deal thật tới Telegram (Nếu chưa cấu hình Token sẽ log cảnh báo và tiếp tục chu trình)"""
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", self.bot_token)
+        self.chat_id = os.getenv("TELEGRAM_CHAT_ID", self.chat_id)
+
         if not self.bot_token or not self.chat_id:
-            raise RuntimeError(
-                "Chưa cấu hình Telegram Bot Token hoặc Chat ID! "
-                "Hệ thống không thể bắn deal tự động. Vui lòng nhập thông tin tại tab 'Cài Đặt'."
+            logging.warning(
+                f"⚠️ Chưa cấu hình Telegram Bot Token hoặc Chat ID. "
+                f"[CHẾ ĐỘ MÔ PHỎNG] Bỏ qua gửi Telegram cho deal: {deal.get('name', '')[:30]}..."
             )
+            return False
 
         message_html = DealContentWriter.generate_telegram_post(deal)
         image_url = deal.get("image_url")
@@ -46,6 +50,8 @@ class TelegramPublisher:
                 logging.info(f"✅ Đã gửi deal [{deal['name'][:30]}...] tới Telegram ({self.chat_id}) thành công!")
                 return True
             else:
-                raise RuntimeError(f"Telegram Bot API trả về lỗi {resp.status_code}: {resp.text}")
+                logging.warning(f"Telegram Bot API trả về lỗi {resp.status_code}: {resp.text}")
+                return False
         except Exception as e:
-            raise RuntimeError(f"Lỗi khi gửi bài tới Telegram: {e}")
+            logging.warning(f"Lỗi khi gửi bài tới Telegram: {e}")
+            return False
