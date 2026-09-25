@@ -4,8 +4,8 @@
     <div class="brand">
       <div class="brand-icon">⚡</div>
       <div class="brand-text">
-        <h2>Shopee Aff AI</h2>
-        <span>Command Center</span>
+        <h2>Shopee & Laz Aff</h2>
+        <span>Multi-Platform Hub</span>
       </div>
     </div>
 
@@ -18,39 +18,35 @@
       </div>
     </div>
 
-    <!-- Navigation Menu -->
+    <!-- Navigation Menu (5 Hubs) -->
     <nav class="nav-menu">
       <button class="nav-item" [class.active]="activeTab === 'dashboard'" (click)="switchTab('dashboard')">
         <span class="icon">📊</span>
-        <span>Thống Kê Tổng Quan</span>
-      </button>
-
-      <button class="nav-item" [class.active]="activeTab === 'schedule'" (click)="switchTab('schedule')">
-        <span class="icon">⏰</span>
-        <span>Lịch Chạy Hàng Ngày</span>
-        <span class="badge badge-accent">{{ schedule.enabled ? schedule.time : 'Tắt' }}</span>
+        <span>Doanh Thu & ROI</span>
+        <span class="badge badge-accent" *ngIf="(stats.total_commission_vnd || 0) > 0">{{ stats.total_commission_vnd | number }}đ</span>
       </button>
 
       <button class="nav-item" [class.active]="activeTab === 'deals'" (click)="switchTab('deals')">
         <span class="icon">🛍️</span>
-        <span>Sản Phẩm Đã Săn</span>
+        <span>Săn Deal & Khuyến Mại</span>
         <span class="badge" *ngIf="stats.deals_today > 0">{{ stats.deals_today }}</span>
       </button>
 
-      <button class="nav-item" [class.active]="activeTab === 'groups'" (click)="switchTab('groups')">
-        <span class="icon">👥</span>
-        <span>Nhóm Facebook</span>
+      <button class="nav-item" [class.active]="activeTab === 'marketing'" (click)="switchTab('marketing')">
+        <span class="icon">📢</span>
+        <span>Tiếp Thị & Lan Tỏa FB</span>
         <span class="badge badge-accent" *ngIf="stats.groups_total > 0">{{ stats.groups_total }}</span>
       </button>
 
       <button class="nav-item" [class.active]="activeTab === 'settings'" (click)="switchTab('settings')">
         <span class="icon">⚙️</span>
-        <span>Tài Khoản & Cấu Hình</span>
+        <span>Cài Đặt & Lịch Chạy</span>
+        <span class="badge badge-accent">{{ schedule.enabled ? schedule.time : 'Tắt' }}</span>
       </button>
 
       <button class="nav-item" [class.active]="activeTab === 'logs'" (click)="switchTab('logs')">
         <span class="icon">📜</span>
-        <span>Xem Nhật Ký (Live)</span>
+        <span>Nhật Ký (Live Stream)</span>
       </button>
     </nav>
 
@@ -68,25 +64,29 @@
     <!-- Header -->
     <header class="top-header">
       <div class="page-title">
-        <h1 *ngIf="activeTab === 'dashboard'">Bảng Điều Khiển & Thống Kê</h1>
-        <h1 *ngIf="activeTab === 'schedule'">Cấu Hình Lịch Chạy Tự Động Hàng Ngày</h1>
-        <h1 *ngIf="activeTab === 'deals'">Danh Sách Top Deal Đã Lọc Hôm Nay</h1>
-        <h1 *ngIf="activeTab === 'groups'">Quản Lý Group Facebook Dò Tìm Được</h1>
-        <h1 *ngIf="activeTab === 'settings'">Cấu Hình Tài Khoản & Tiêu Chí Lọc</h1>
-        <h1 *ngIf="activeTab === 'logs'">Nhật Ký Thực Thi Hệ Thống (Real-Time)</h1>
-        <p class="subtitle">Hệ thống tự động hóa săn deal Shopee và mở rộng cộng đồng Facebook (Dữ liệu thật 100%)</p>
+        <h1 *ngIf="activeTab === 'dashboard'">Bảng Điều Khiển & Hiệu Quả Doanh Thu (ROI Hub)</h1>
+        <h1 *ngIf="activeTab === 'deals'">Quản Lý Deal & Khung Giờ Flash Sale (Shopee & Lazada)</h1>
+        <h1 *ngIf="activeTab === 'marketing'">Tiếp Thị, Soạn Bài Đăng & Lan Tỏa Facebook</h1>
+        <h1 *ngIf="activeTab === 'settings'">Cấu Hình Hệ Thống, Tài Khoản & Lịch Chạy Tự Động</h1>
+        <h1 *ngIf="activeTab === 'logs'">Nhật Ký Thực Thi Hệ Thống (Live Real-Time)</h1>
+        <p class="subtitle">Hệ thống tự động hóa Affiliate Đa Sàn (Shopee & Lazada), phễu người dùng và tăng tỷ lệ chuyển đổi</p>
       </div>
 
       <div class="header-actions">
+        <a href="/deals" target="_blank" class="btn-table-link" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+          🌐 Cổng Deal Khách Hàng (/deals) ↗
+        </a>
         <span class="time-stamp" *ngIf="stats.last_run">Lần chạy cuối: {{ stats.last_run }}</span>
         <button class="btn-refresh" (click)="fetchStats(); fetchHealth()">🔄 Làm Mới</button>
         <button class="btn-clear-top" (click)="resetAllData()" title="Xóa sạch toàn bộ sản phẩm và nhóm ảo">🧹 Xóa Dữ Liệu Ảo</button>
       </div>
     </header>
 
-    <!-- TAB 1: DASHBOARD -->
+    <!-- ========================================== -->
+    <!-- HUB 1: DOANH THU & HIỆU QUẢ ROI (DASHBOARD) -->
+    <!-- ========================================== -->
     <section class="content-body" *ngIf="activeTab === 'dashboard'">
-      <!-- Missing Config Alert (Báo lỗi thật, không fake dữ liệu) -->
+      <!-- Missing Config Alert -->
       <div class="alert-box warning-card glass-card" *ngIf="!health.ready">
         <div class="alert-icon">⚠️</div>
         <div class="alert-content">
@@ -109,209 +109,1934 @@
         <button class="btn-fix" (click)="switchTab('logs')">Xem Log Chi Tiết →</button>
       </div>
 
-      <!-- Stats Cards Grid -->
-      <div class="stats-grid">
-        <div class="stat-card glass-card">
-          <div class="stat-header">
-            <span class="stat-title">Ngành Hàng Theo Dõi</span>
-            <span class="stat-icon purple">📦</span>
-          </div>
-          <div class="stat-number">{{ stats.categories_count }}</div>
-          <span class="stat-desc">Danh mục thật từ Shopee</span>
-        </div>
-
-        <div class="stat-card glass-card">
-          <div class="stat-header">
-            <span class="stat-title">Deals Săn Hôm Nay</span>
-            <span class="stat-icon emerald">🔥</span>
-          </div>
-          <div class="stat-number">{{ stats.deals_today }}</div>
-          <span class="stat-desc">Tổng số deal đã lưu: {{ stats.deals_total }}</span>
-        </div>
-
-        <div class="stat-card glass-card">
-          <div class="stat-header">
-            <span class="stat-title">Group Facebook Dò Được</span>
-            <span class="stat-icon blue">👥</span>
-          </div>
-          <div class="stat-number">{{ stats.groups_total }}</div>
-          <span class="stat-desc">Thành viên $\ge$ 10.000</span>
-        </div>
-
-        <div class="stat-card glass-card">
-          <div class="stat-header">
-            <span class="stat-title">Lịch Chạy Hàng Ngày</span>
-            <span class="stat-icon amber">⏰</span>
-          </div>
-          <div class="stat-number font-time">{{ schedule.enabled ? schedule.time : 'Tắt' }}</div>
-          <span class="stat-desc">{{ schedule.enabled ? 'Tự động quét mỗi ngày' : 'Chưa bật lịch chạy' }}</span>
-        </div>
-      </div>
-
       <!-- Quick Action Banner -->
-      <div class="action-banner glass-card">
+      <div class="action-banner glass-card" style="margin-bottom: 24px;">
         <div class="banner-content">
           <h3>Sẵn sàng quét deal và đẩy bài tự động?</h3>
-          <p>Hệ thống sẽ lấy dữ liệu thật từ Shopee, tính điểm deal, bắn vào kênh Telegram và dò tìm group Facebook theo đúng ngành hàng.</p>
+          <p>Hệ thống sẽ lấy dữ liệu thật từ Shopee & Lazada, tính điểm deal, bắn vào Telegram và chuẩn bị bài đăng cho các nhóm Facebook.</p>
         </div>
         <button class="btn-primary" [disabled]="stats.is_running" (click)="runWorkflowNow()">
           {{ stats.is_running ? 'Đang Chạy Quét...' : 'Bắt Đầu Quét Ngay' }}
         </button>
       </div>
 
-      <!-- Recent Deals Preview -->
-      <div class="section-container glass-card">
-        <div class="section-header">
-          <h3>Deals Mới Nhất Vừa Quét</h3>
-          <button class="btn-link" (click)="switchTab('deals')">Xem tất cả →</button>
-        </div>
-        <div class="deals-mini-list" *ngIf="deals.length > 0; else noDeals">
-          <div class="deal-row" *ngFor="let d of deals.slice(0, 5)">
-            <div class="deal-info">
-              <span class="deal-badge">{{ d.category_name }}</span>
-              <h4 class="deal-name">{{ d.name }}</h4>
-            </div>
-            <div class="deal-pricing">
-              <span class="price-sale">{{ d.price_sale | number }}đ</span>
-              <span class="discount-tag">-{{ d.discount_percent }}%</span>
-            </div>
-            <a [href]="d.aff_url || d.item_url" target="_blank" class="btn-view">Link Aff ↗</a>
+      <!-- Core Financial KPIs (4 Cards) -->
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Tổng Doanh Thu (GMV)</span>
+            <span class="stat-icon purple">📦</span>
           </div>
-        </div>
-        <ng-template #noDeals>
-          <div class="empty-state">Chưa có deal nào trong kho dữ liệu. Hãy cấu hình tài khoản và bấm "Bắt Đầu Quét Ngay"!</div>
-        </ng-template>
-      </div>
-    </section>
-
-    <!-- TAB: SCHEDULER (LỊCH CHẠY HÀNG NGÀY) -->
-    <section class="content-body" *ngIf="activeTab === 'schedule'">
-      <div class="schedule-container glass-card">
-        <div class="schedule-header">
-          <div class="schedule-icon">⏰</div>
-          <div>
-            <h3>Bộ Hẹn Giờ Tự Động Chạy Mỗi Ngày (Cronjob)</h3>
-            <p>Hệ thống sẽ tự động thức dậy vào khung giờ bạn chỉ định để cào deal và đăng bài mà không cần bạn phải thao tác bằng tay.</p>
-          </div>
+          <div class="stat-number font-number">{{ (commissionStats?.total_gmv_vnd || 0) | number }}đ</div>
+          <span class="stat-desc">Giá trị đơn hàng phát sinh từ link Aff</span>
         </div>
 
-        <div class="schedule-form">
-          <div class="form-group toggle-group">
-            <label class="switch-label">
-              <input type="checkbox" [(ngModel)]="schedule.enabled">
-              <span class="slider"></span>
-              <strong>Bật Lịch Chạy Hàng Ngày Tự Động</strong>
-            </label>
-            <small>Khi bật, bot ngầm sẽ tự động quét deal và gửi bài đúng giờ mỗi ngày</small>
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Hoa Hồng Thực Nhận</span>
+            <span class="stat-icon emerald">💰</span>
           </div>
+          <div class="stat-number font-number" style="color: #34d399;">{{ (commissionStats?.total_commission_vnd || 0) | number }}đ</div>
+          <span class="stat-desc">Đã đối soát từ Shopee & Lazada ({{ commissionStats?.total_orders || 0 }} đơn)</span>
+        </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Giờ chạy hàng ngày (Định dạng HH:MM):</label>
-              <input type="time" [(ngModel)]="schedule.time" class="time-input">
-              <small>Khuyên dùng: 08:00 (Sáng) hoặc 19:30 (Tối) khi lượng mua hàng cao nhất</small>
-            </div>
-
-            <div class="form-group">
-              <label>Số lượng ngành hàng cần quét mỗi lần:</label>
-              <input type="number" min="1" max="10" [(ngModel)]="schedule.cats">
-              <small>Mỗi ngành sẽ lấy Top 3 deal hời nhất (VD: 3 ngành = 9 deal/ngày)</small>
-            </div>
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Thu Nhập / Click (EPC)</span>
+            <span class="stat-icon blue">⚡</span>
           </div>
+          <div class="stat-number font-number" style="color: #38bdf8;">{{ (commissionStats?.epc_vnd || 0) | number }}đ</div>
+          <span class="stat-desc">Earning Per Click (Tổng click: {{ clickAnalytics?.total_clicks || 0 }})</span>
+        </div>
 
-          <div class="schedule-info-box">
-            <span>Trạng thái hiện tại:</span>
-            <strong>{{ schedule.enabled ? ('Đã lên lịch chạy vào lúc ' + schedule.time + ' hàng ngày') : 'Đang tạm tắt lịch chạy tự động' }}</strong>
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-title">Tỷ Lệ Chuyển Đổi (CR)</span>
+            <span class="stat-icon amber">🎯</span>
           </div>
-
-          <div class="schedule-actions">
-            <button class="btn-save" (click)="saveSchedule()">💾 Lưu Cài Đặt Lịch Chạy</button>
-          </div>
+          <div class="stat-number font-number" style="color: #fbbf24;">{{ commissionStats?.conversion_rate || 0 }}%</div>
+          <span class="stat-desc">Đơn chốt thành công / Lượt click</span>
         </div>
       </div>
-    </section>
 
-    <!-- TAB: DEALS LIST -->
-    <section class="content-body" *ngIf="activeTab === 'deals'">
-      <div class="tab-toolbar" *ngIf="deals.length > 0">
-        <span class="toolbar-info">Tổng cộng <strong>{{ deals.length }}</strong> sản phẩm deal</span>
-        <button class="btn-clear-table" (click)="clearDeals()">🗑️ Xóa Toàn Bộ Sản Phẩm</button>
-      </div>
-
-      <div class="deals-grid" *ngIf="deals.length > 0; else emptyDeals">
-        <div class="deal-card glass-card" *ngFor="let deal of deals">
-          <div class="deal-badge-strip">
-            <span class="cat-pill">{{ deal.category_name }}</span>
-            <span class="discount-pill">-{{ deal.discount_percent }}%</span>
-          </div>
-          <h3 class="deal-title" [title]="deal.name">{{ deal.name }}</h3>
-          
-          <div class="deal-meta">
-            <span>⭐ {{ deal.rating_star }}</span>
-            <span>Đã bán: {{ deal.historical_sold | number }}</span>
-            <span class="score-tag">Điểm: {{ deal.deal_score }}</span>
-          </div>
-
-          <div class="deal-footer">
-            <div class="price-box">
-              <div class="price-current">{{ deal.price_sale | number }}đ</div>
-              <div class="price-old">{{ deal.price_original | number }}đ</div>
-            </div>
-            <a [href]="deal.aff_url || deal.item_url" target="_blank" class="btn-buy">
-              Mua Ngay ↗
-            </a>
-          </div>
-        </div>
-      </div>
-      <ng-template #emptyDeals>
-        <div class="glass-card empty-card">
-          <p>Chưa có sản phẩm nào được lưu trữ. Hãy kích hoạt chạy chu trình quét deal!</p>
-        </div>
-      </ng-template>
-    </section>
-
-    <!-- TAB: GROUPS OUTREACH -->
-    <section class="content-body" *ngIf="activeTab === 'groups'">
-      <div class="tab-toolbar" *ngIf="groups.length > 0">
-        <span class="toolbar-info">Tổng cộng <strong>{{ groups.length }}</strong> nhóm Facebook</span>
-        <button class="btn-clear-table" (click)="clearGroups()">🗑️ Xóa Toàn Bộ Nhóm</button>
-      </div>
-
-      <div class="glass-card table-container">
-        <table class="custom-table" *ngIf="groups.length > 0; else emptyGroups">
-          <thead>
-            <tr>
-              <th>Tên Group Facebook</th>
-              <th>Ngành Hàng</th>
-              <th>Thành Viên</th>
-              <th>Trạng Thái</th>
-              <th>Hành Động</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let g of groups">
-              <td class="font-medium">{{ g.name }}</td>
-              <td><span class="tag-pill">{{ g.category_name }}</span></td>
-              <td><strong>{{ g.members_count | number }}</strong></td>
-              <td>
-                <span class="status-pill" [ngClass]="g.status.toLowerCase()">
-                  {{ g.status === 'PENDING' ? 'Chờ Duyệt' : (g.status === 'APPROVED' ? 'Đã Tham Gia' : 'Mới Tìm Thấy') }}
+      <!-- 2 Columns: Sàn (Shopee vs Lazada) & Kênh Tiếp Thị (Sub-IDs) -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <!-- Card Phân Bổ Theo Sàn -->
+        <div class="glass-card" style="padding: 22px; border-radius: 16px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+            <span>⚖️</span> Tỷ Trọng Hoa Hồng Theo Sàn
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <!-- Shopee -->
+            <div style="background: rgba(234, 88, 12, 0.08); border: 1px solid rgba(234, 88, 12, 0.25); border-radius: 10px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: #fb923c; display: flex; align-items: center; gap: 6px;">
+                  <span>🟠</span> Shopee Affiliate
                 </span>
-              </td>
-              <td>
-                <a [href]="g.url" target="_blank" class="btn-table-link">Mở Link ↗</a>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <ng-template #emptyGroups>
-          <div class="empty-card">Chưa có group nào được tìm kiếm. Kích hoạt chạy chu trình để dò tìm tự động!</div>
+                <strong style="color: #fff; font-size: 1.05rem;">{{ (commissionStats?.by_platform?.SHOPEE?.commission || 0) | number }}đ</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
+                <span>Số đơn: {{ commissionStats?.by_platform?.SHOPEE?.orders || 0 }}</span>
+                <span>GMV: {{ (commissionStats?.by_platform?.SHOPEE?.gmv || 0) | number }}đ</span>
+              </div>
+            </div>
+
+            <!-- Lazada -->
+            <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 10px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                  <span>🔵</span> Lazada Affiliate
+                </span>
+                <strong style="color: #fff; font-size: 1.05rem;">{{ (commissionStats?.by_platform?.LAZADA?.commission || 0) | number }}đ</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
+                <span>Số đơn: {{ commissionStats?.by_platform?.LAZADA?.orders || 0 }}</span>
+                <span>GMV: {{ (commissionStats?.by_platform?.LAZADA?.gmv || 0) | number }}đ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Phân Bổ Theo Kênh Phân Phối (Sub-ID Attribution) -->
+        <div class="glass-card" style="padding: 22px; border-radius: 16px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+            <span>🧭</span> Hiệu Quả Kênh Phân Phối (Sub-ID Attribution)
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+              <span style="display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: 0.88rem;">
+                <span>✈️</span> Kênh Telegram (tele)
+              </span>
+              <div style="text-align: right;">
+                <span style="font-weight: 700; color: #34d399;">{{ (commissionStats?.by_channel?.TELEGRAM?.commission || 0) | number }}đ</span>
+                <small style="display: block; font-size: 0.72rem; color: #94a3b8;">{{ commissionStats?.by_channel?.TELEGRAM?.orders || 0 }} đơn</small>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+              <span style="display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: 0.88rem;">
+                <span>👥</span> Bài Đăng Group FB (fb_group)
+              </span>
+              <div style="text-align: right;">
+                <span style="font-weight: 700; color: #38bdf8;">{{ (commissionStats?.by_channel?.FB_GROUP?.commission || 0) | number }}đ</span>
+                <small style="display: block; font-size: 0.72rem; color: #94a3b8;">{{ commissionStats?.by_channel?.FB_GROUP?.orders || 0 }} đơn</small>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+              <span style="display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: 0.88rem;">
+                <span>🌐</span> Cổng Deal Web Hub (web_hub)
+              </span>
+              <div style="text-align: right;">
+                <span style="font-weight: 700; color: #f472b6;">{{ (commissionStats?.by_channel?.WEB_HUB?.commission || 0) | number }}đ</span>
+                <small style="display: block; font-size: 0.72rem; color: #94a3b8;">{{ commissionStats?.by_channel?.WEB_HUB?.orders || 0 }} đơn</small>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+              <span style="display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: 0.88rem;">
+                <span>💬</span> Bình Luận Seeding FB (seeding)
+              </span>
+              <div style="text-align: right;">
+                <span style="font-weight: 700; color: #fbbf24;">{{ (commissionStats?.by_channel?.SEEDING?.commission || 0) | number }}đ</span>
+                <small style="display: block; font-size: 0.72rem; color: #94a3b8;">{{ commissionStats?.by_channel?.SEEDING?.orders || 0 }} đơn</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Performing Deals by Clicks + Mini Deals List -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <div class="glass-card" style="padding: 24px; border-radius: 16px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 1.05rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <span>🔥</span> Top Sản Phẩm Được Click Nhiều Nhất
+          </h3>
+          <div class="deals-mini-list" *ngIf="clickAnalytics && clickAnalytics.top_items.length > 0; else noTopItems">
+            <div class="deal-row" *ngFor="let item of clickAnalytics.top_items">
+              <div class="deal-info">
+                <h4 class="deal-name">{{ item.name || ('Sản phẩm #' + item.item_id) }}</h4>
+                <span class="deal-badge" *ngIf="item.price_sale">{{ item.price_sale | number }}đ</span>
+              </div>
+              <div class="deal-pricing">
+                <span class="price-sale" style="color: #38bdf8;">{{ item.clicks }} clicks</span>
+              </div>
+              <a [href]="'/r/' + item.item_id" target="_blank" class="btn-view">Link Anti-Ban ↗</a>
+            </div>
+          </div>
+          <ng-template #noTopItems>
+            <div style="color: #94a3b8; font-style: italic; padding: 12px 0;">Chưa có lượt click nào được ghi nhận. Chia sẻ link deal để bắt đầu đo lường!</div>
+          </ng-template>
+        </div>
+
+        <div class="glass-card" style="padding: 24px; border-radius: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 1.05rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🛍️</span> Deals Mới Nhất Vừa Quét
+            </h3>
+            <button class="btn-link" (click)="switchTab('deals')">Xem kho deal →</button>
+          </div>
+          <div class="deals-mini-list" *ngIf="deals.length > 0; else noDeals">
+            <div class="deal-row" *ngFor="let d of deals.slice(0, 5)">
+              <div class="deal-info">
+                <span class="deal-badge">{{ d.category_name }}</span>
+                <h4 class="deal-name">{{ d.name }}</h4>
+              </div>
+              <div class="deal-pricing">
+                <span class="price-sale">{{ d.price_sale | number }}đ</span>
+                <span class="discount-tag">-{{ d.discount_percent }}%</span>
+              </div>
+              <a [href]="d.aff_url || d.item_url" target="_blank" class="btn-view">Link Aff ↗</a>
+            </div>
+          </div>
+          <ng-template #noDeals>
+            <div class="empty-state">Chưa có deal nào trong kho. Bấm "Bắt Đầu Quét Ngay" để quét deal mới nhất!</div>
+          </ng-template>
+        </div>
+      </div>
+
+      <!-- CSV Import & Demo Tool Toolbar -->
+      <div class="glass-card" style="padding: 18px 24px; margin-bottom: 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <span style="font-weight: 700; color: #f8fafc; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+            <span>📥</span> Nhập Báo Cáo Hoa Hồng (CSV):
+          </span>
+          <select [(ngModel)]="csvPlatform" style="padding: 7px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 8px; font-size: 0.85rem;">
+            <option value="SHOPEE">Shopee Affiliate</option>
+            <option value="LAZADA">Lazada Affiliate</option>
+          </select>
+          <label class="btn-action-green" style="cursor: pointer; padding: 7px 14px; font-size: 0.85rem; border-radius: 8px; margin: 0; display: inline-flex; align-items: center; gap: 6px;">
+            <span>📂 Chọn Tệp CSV...</span>
+            <input type="file" accept=".csv" (change)="onCsvFileSelected($event)" style="display: none;">
+          </label>
+          <small style="color: #94a3b8; font-size: 0.8rem;">Tải tệp Conversion Report từ portal sàn về để cập nhật doanh thu tự động</small>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-table-link" (click)="seedDemoCommissions()" style="padding: 8px 14px; font-size: 0.82rem; background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; border-radius: 8px; cursor: pointer; font-weight: 600;">
+            ⚡ Nạp Doanh Thu Mẫu (Seed Demo)
+          </button>
+          <button class="btn-refresh" (click)="fetchCommissions()" style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px;">🔄 Làm Mới</button>
+        </div>
+      </div>
+
+      <!-- Table: Recent Commissions List -->
+      <div class="glass-card" style="padding: 24px; border-radius: 16px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+            <span>📋</span> Danh Sách Đơn Hàng & Hoa Hồng Mới Nhất ({{ commissions.length }} đơn)
+          </h3>
+        </div>
+
+        <div style="overflow-x: auto;" *ngIf="commissions.length > 0; else noCommissions">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; text-transform: uppercase; font-size: 0.75rem;">
+                <th style="padding: 10px 12px;">Mã Đơn</th>
+                <th style="padding: 10px 12px;">Sàn</th>
+                <th style="padding: 10px 12px;">Tên Sản Phẩm</th>
+                <th style="padding: 10px 12px;">Doanh Thu (GMV)</th>
+                <th style="padding: 10px 12px;">Hoa Hồng</th>
+                <th style="padding: 10px 12px;">Kênh (Sub-ID)</th>
+                <th style="padding: 10px 12px;">Trạng Thái</th>
+                <th style="padding: 10px 12px;">Thời Gian</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of commissions" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <td style="padding: 10px 12px; font-family: monospace; color: #cbd5e1;">{{ c.order_id }}</td>
+                <td style="padding: 10px 12px;">
+                  <span class="badge" [style.background]="c.platform === 'LAZADA' ? 'rgba(2,132,199,0.2)' : 'rgba(234,88,12,0.2)'" [style.color]="c.platform === 'LAZADA' ? '#38bdf8' : '#fb923c'">
+                    {{ c.platform }}
+                  </span>
+                </td>
+                <td style="padding: 10px 12px; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #f1f5f9;" [title]="c.item_name">
+                  {{ c.item_name || 'Đơn hàng đa sản phẩm' }}
+                </td>
+                <td style="padding: 10px 12px; font-weight: 600; color: #e2e8f0;">{{ c.gmv_vnd | number }}đ</td>
+                <td style="padding: 10px 12px; font-weight: 700; color: #34d399;">+{{ c.commission_vnd | number }}đ</td>
+                <td style="padding: 10px 12px;">
+                  <span style="background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 6px; font-size: 0.78rem; color: #cbd5e1;">
+                    {{ c.sub_id_channel || 'DIRECT' }}
+                  </span>
+                </td>
+                <td style="padding: 10px 12px;">
+                  <span class="badge-approved" *ngIf="c.order_status === 'COMPLETED' || c.order_status === 'APPROVED'" style="padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">
+                    Thành công
+                  </span>
+                  <span class="badge-pending" *ngIf="c.order_status !== 'COMPLETED' && c.order_status !== 'APPROVED'" style="padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">
+                    {{ c.order_status || 'Chờ duyệt' }}
+                  </span>
+                </td>
+                <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.78rem;">{{ c.created_at }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noCommissions>
+          <div style="text-align: center; padding: 36px 12px; color: #94a3b8;">
+            <p>Chưa có dữ liệu hoa hồng nào được ghi nhận.</p>
+            <button class="btn-action-green" (click)="seedDemoCommissions()" style="margin-top: 10px; cursor: pointer;">
+              ⚡ Nạp Dữ Liệu Doanh Thu Mẫu (Seed Demo)
+            </button>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- Table: Subscribers from Deal Hub Web (/deals) -->
+      <div class="glass-card" style="padding: 24px; border-radius: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+              <span>📬</span> Khách Hàng Đăng Ký Nhận Tin Deal (Subscribers - {{ subscribers.length }})
+            </h3>
+            <small style="color: #94a3b8;">Thu thập từ biểu mẫu trên Cổng Săn Deal Khách Hàng (/deals) để remarketing & giữ chân người dùng</small>
+          </div>
+          <a href="/deals" target="_blank" class="btn-action-green" style="text-decoration: none; padding: 6px 14px; font-size: 0.8rem; border-radius: 8px;">
+            Mở Cổng Deal ↗
+          </a>
+        </div>
+
+        <div style="overflow-x: auto;" *ngIf="subscribers.length > 0; else noSubs">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; text-transform: uppercase; font-size: 0.75rem;">
+                <th style="padding: 10px 12px;">ID</th>
+                <th style="padding: 10px 12px;">Email</th>
+                <th style="padding: 10px 12px;">Số Điện Thoại / Zalo</th>
+                <th style="padding: 10px 12px;">Ngành Hàng Quan Tâm</th>
+                <th style="padding: 10px 12px;">Nguồn</th>
+                <th style="padding: 10px 12px;">Thời Gian Đăng Ký</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of subscribers" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <td style="padding: 10px 12px; color: #94a3b8;">#{{ s.id }}</td>
+                <td style="padding: 10px 12px; font-weight: 600; color: #f8fafc;">{{ s.email }}</td>
+                <td style="padding: 10px 12px; color: #cbd5e1;">{{ s.phone || 'Chưa cung cấp' }}</td>
+                <td style="padding: 10px 12px;">
+                  <span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc;">
+                    {{ s.preferred_category || 'Tất cả ngành' }}
+                  </span>
+                </td>
+                <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.8rem;">{{ s.source || 'WEB_PORTAL' }}</td>
+                <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.8rem;">{{ s.created_at }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noSubs>
+          <div style="text-align: center; padding: 28px 12px; color: #94a3b8;">
+            Chưa có khách hàng đăng ký nhận tin deal. Người dùng truy cập <code>/deals</code> và đăng ký sẽ tự động xuất hiện tại đây!
+          </div>
         </ng-template>
       </div>
     </section>
 
-    <!-- TAB: SETTINGS & ACCOUNTS -->
+    <!-- ============================================== -->
+    <!-- HUB 2: SĂN DEAL & KHUYẾN MẠI (DEALS & PROMOTIONS) -->
+    <!-- ============================================== -->
+    <section class="content-body" *ngIf="activeTab === 'deals'">
+      <!-- Subnav Bar -->
+      <div class="subnav-bar">
+        <button class="subnav-pill" [class.active]="dealsSubTab === 'deals'" (click)="setDealsSubTab('deals')">
+          <span>🛍️ Kho Deal Đa Sàn ({{ deals.length }})</span>
+        </button>
+        <button class="subnav-pill" [class.active]="dealsSubTab === 'vouchers'" (click)="setDealsSubTab('vouchers')">
+          <span>🎟️ Mã Nhập Tay & Mẹo Săn Thực Chiến</span>
+          <span class="badge badge-accent" style="margin-left: 6px;">{{ voucherCodes.length }}</span>
+        </button>
+        <button class="subnav-pill" [class.active]="dealsSubTab === 'promotions'" (click)="setDealsSubTab('promotions')">
+          <span>⏰ Khung Giờ Flash Sale & Nhắc Lịch</span>
+          <span class="badge badge-accent" *ngIf="promotionData?.upcoming_slot" style="margin-left: 6px;">{{ promotionData?.upcoming_slot?.slot }}</span>
+        </button>
+      </div>
+
+      <!-- SUBTAB 2A: KHO DEAL ĐA SÀN (SHOPEE & LAZADA) -->
+      <div *ngIf="dealsSubTab === 'deals'">
+        <!-- Toolbar Bộ lọc sàn & độ tươi -->
+        <div class="deals-filter-bar glass-card" style="padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Sàn:</span>
+            <button class="group-tab-btn" [class.active]="dealPlatformFilter === 'ALL'" (click)="setDealPlatformFilter('ALL')">
+              Tất Cả ({{ stats.deals_total || deals.length }})
+            </button>
+            <button class="group-tab-btn" [class.active]="dealPlatformFilter === 'SHOPEE'" (click)="setDealPlatformFilter('SHOPEE')">
+              🟠 Shopee ({{ stats.deals_shopee || 0 }})
+            </button>
+            <button class="group-tab-btn" [class.active]="dealPlatformFilter === 'LAZADA'" (click)="setDealPlatformFilter('LAZADA')">
+              🔵 Lazada ({{ stats.deals_lazada || 0 }})
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Chiến Lược:</span>
+            <button class="group-tab-btn" [class.active]="dealTypeFilter === 'ALL'" (click)="setDealTypeFilter('ALL')">Tất Cả Deal</button>
+            <button class="group-tab-btn" [class.active]="dealTypeFilter === 'LOSS_LEADER'" (click)="setDealTypeFilter('LOSS_LEADER')" style="color: #f87171;">🎯 Mồi 1K (Cookie 7D)</button>
+            <button class="group-tab-btn" [class.active]="dealTypeFilter === 'EXTRA'" (click)="setDealTypeFilter('EXTRA')" style="color: #fbbf24;">💰 Hoa Hồng Khủng Xtra</button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Độ tươi:</span>
+            <button class="group-tab-btn" [class.active]="dealFreshnessFilter === 'ALL'" (click)="setDealFreshnessFilter('ALL')">Tất cả</button>
+            <button class="group-tab-btn" [class.active]="dealFreshnessFilter === 'FRESH'" (click)="setDealFreshnessFilter('FRESH')">✅ Còn hàng</button>
+            <button class="group-tab-btn" [class.active]="dealFreshnessFilter === 'STALE'" (click)="setDealFreshnessFilter('STALE')">⚠️ Hết hàng/hạn</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn-action-green" [disabled]="verifyingAllDeals" (click)="verifyAllDealsFreshness()" style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span>{{ verifyingAllDeals ? '⏳ Đang quét...' : '🔍 Quét Độ Tươi Toàn Bộ' }}</span>
+            </button>
+            <button class="btn-table-link" (click)="fetchLossLeadersManual()" style="padding: 8px 14px; font-size: 0.82rem; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 8px; cursor: pointer;">
+              🎯 Săn Deal Mồi 1K
+            </button>
+            <button class="btn-clear-table" *ngIf="deals.length > 0" (click)="clearDeals()">🗑️ Xóa</button>
+          </div>
+        </div>
+
+        <div class="deals-grid" *ngIf="deals.length > 0; else emptyDeals">
+          <div class="deal-card glass-card" *ngFor="let deal of deals" [style.border-color]="deal.is_stale === 1 ? 'rgba(239, 68, 68, 0.4)' : ''">
+            <!-- Thumbnail ảnh đóng khung Flash Sale -->
+            <div class="deal-img-wrapper" (click)="openImagePreview(deal)" title="Bấm để phóng to xem ảnh banner đóng khung Flash Sale 800x800">
+              <img [src]="getDealImageUrl(deal)" 
+                   [alt]="deal.name" 
+                   class="deal-thumb"
+                   loading="lazy"
+                   referrerpolicy="no-referrer"
+                   (error)="onImageError($event, deal)">
+              <div class="img-overlay-tag" [style.background]="deal.platform === 'LAZADA' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'linear-gradient(135deg, #ea580c, #ee4d2d)'">
+                {{ deal.platform === 'LAZADA' ? '🔵 Lazada' : '🟠 Shopee' }}
+              </div>
+              <div class="img-overlay-tag" *ngIf="deal.is_stale === 1" style="left: 10px; top: 38px; background: rgba(239, 68, 68, 0.95); font-size: 0.72rem;">
+                ⚠️ Hết hàng/hạn
+              </div>
+              <div class="img-zoom-hint">🔍 Phóng to</div>
+            </div>
+
+            <!-- Dải nhãn phân loại & giảm giá -->
+            <div class="deal-badge-strip">
+              <span class="cat-pill" [title]="deal.category_name">{{ deal.category_name }}</span>
+              <span class="discount-pill">-{{ deal.discount_percent }}%</span>
+              <span class="commission-pill" *ngIf="(deal.commission_rate || 0) > 0 || deal.is_extra === 1" [title]="'Hoa hồng thưởng thêm: ' + deal.commission_rate + '%'">
+                💰 HH {{ deal.commission_rate || 15 }}% {{ deal.is_extra ? 'Xtra' : '' }}
+              </span>
+              <span class="price-verdict-pill" 
+                    [class.loss-leader]="deal.price_badge === 'LOSS_LEADER_1K'"
+                    [class.low]="deal.price_badge?.includes('LOW')" 
+                    [class.real]="deal.price_badge?.includes('REAL')" 
+                    [class.suspicious]="deal.price_badge?.includes('SUSPICIOUS')">
+                {{ deal.price_badge === 'LOSS_LEADER_1K' ? '🎯 Deal Mồi 1K' : (deal.price_badge?.includes('LOW') ? '📉 Đáy 30 ngày' : (deal.price_badge?.includes('SUSPICIOUS') ? '⚠️ Giá ảo' : '✅ Giảm thật')) }}
+              </span>
+            </div>
+
+            <!-- Tiêu đề deal chuẩn 2 dòng đồng đều -->
+            <h3 class="deal-title" [title]="deal.name">{{ deal.name }}</h3>
+            
+            <!-- Thông số uy tín -->
+            <div class="deal-meta">
+              <span class="meta-item"><span class="meta-icon">⭐</span> {{ deal.rating_star }}</span>
+              <span class="meta-item"><span class="meta-icon">🛒</span> Đã bán {{ deal.historical_sold | number }}</span>
+              <span class="score-tag">Điểm: {{ deal.deal_score }}</span>
+            </div>
+
+            <!-- Footer 2 tầng chống vỡ giao diện -->
+            <div class="deal-footer">
+              <div class="footer-price-row">
+                <div class="price-box">
+                  <span class="price-current">{{ deal.price_sale | number }}đ</span>
+                  <span class="price-old" *ngIf="deal.price_original > deal.price_sale">{{ deal.price_original | number }}đ</span>
+                </div>
+                <a [href]="deal.aff_url || deal.item_url" target="_blank" class="btn-buy" [title]="'Mở trực tiếp trên ' + (deal.platform === 'LAZADA' ? 'Lazada' : 'Shopee')">
+                  <span>{{ deal.platform === 'LAZADA' ? 'Lazada' : 'Shopee' }}</span>
+                  <span class="arrow-icon">↗</span>
+                </a>
+              </div>
+
+              <div class="footer-tools-row">
+                <button class="btn-tool btn-tool-share" (click)="openSocialCopilotForDeal(deal)" title="Đưa deal này vào Trợ lý Lan Tỏa MXH: Tạo bài viết & link DeepLink mở thẳng App">
+                  <span class="tool-icon">🚀</span>
+                  <span>Đẩy MXH</span>
+                </button>
+                <button class="btn-tool btn-tool-check" (click)="verifyDealFreshness(deal)" title="Kiểm tra trực tiếp xem deal còn sống và giữ giá sale không">
+                  <span class="tool-icon">🔍</span>
+                  <span>Check Sống</span>
+                </button>
+                <button class="btn-tool btn-tool-copy" (click)="copyBridgeLink(deal.item_id, deal.aff_url || deal.item_url)" title="Sao chép link tiếp thị trực tiếp vào sản phẩm">
+                  <span class="tool-icon">🔗</span>
+                  <span>Copy Link</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ng-template #emptyDeals>
+          <div class="glass-card empty-card">
+            <p>Chưa có sản phẩm nào trong kho deal. Hãy kích hoạt quét deal hoặc cấu hình lịch chạy tự động!</p>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- SUBTAB 2B: MÃ NHẬP TAY, LINK CHIẾN DỊCH & BỘ BÀI ĐĂNG THỰC CHIẾN -->
+      <div *ngIf="dealsSubTab === 'vouchers'">
+        <!-- Hero Header -->
+        <div class="glass-card" style="margin-bottom: 24px; padding: 24px; background: linear-gradient(135deg, rgba(234, 88, 12, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%); border: 1px solid rgba(245, 158, 11, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; color: #fde047; font-weight: 600; margin-bottom: 8px;">
+                <span>🔥</span> TỔNG HỢP VOUCHER THỰC CHIẾN (TOP AFFILIATE PRO STYLE)
+              </div>
+              <h2 style="margin: 0 0 6px 0; font-size: 1.45rem; color: #f8fafc; font-weight: 700;">
+                Mã Giảm Giá Nhập Tay, Giờ Back Mã & Mẹo Săn Sale
+              </h2>
+              <p style="margin: 0; color: #cbd5e1; font-size: 0.92rem;">
+                Tự động tạo trọn bộ 4 dạng bài đăng thực chiến: Loạt mã nhập tay 2 bước, thông báo giờ back mã kèm 2 banner, bắn nhanh mã 25% khủng và deal đồng giá 99K kèm mẹo bật/tắt xu.
+              </p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button class="btn-table-link" (click)="seedDemoVouchers()" style="padding: 9px 16px; font-size: 0.85rem; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.5); color: #34d399; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                ⚡ Nạp Lại Bộ Mã Mẫu 25.9
+              </button>
+              <button class="btn-refresh" (click)="fetchVoucherCodes(); fetchGeneratedPromoPosts()" style="padding: 9px 16px; font-size: 0.85rem; border-radius: 8px; cursor: pointer;">
+                🔄 Làm Mới
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: BỘ SINH BÀI ĐĂNG THỰC CHIẾN (4 DẠNG BÀI ĐỈNH CAO) -->
+        <div class="glass-card" style="padding: 24px; margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>📢</span> Bộ Bài Đăng Thực Chiến Sẵn Sàng (1-Click Copy & Bắn Tin)
+              </h3>
+              <small style="color: #94a3b8;">Chọn dạng bài bên dưới để xem trước, sao chép hoặc bắn thẳng tới kênh Telegram / nhóm Facebook</small>
+            </div>
+
+            <!-- Tabs chọn dạng bài -->
+            <div style="display: flex; gap: 6px; background: #0f172a; padding: 4px; border-radius: 10px; border: 1px solid #334155; flex-wrap: wrap;">
+              <button class="group-tab-btn" [class.active]="selectedPromoPostTab === 'manual'" (click)="selectedPromoPostTab = 'manual'">
+                📋 Mã Nhập Tay (2 Bước)
+              </button>
+              <button class="group-tab-btn" [class.active]="selectedPromoPostTab === 'back'" (click)="selectedPromoPostTab = 'back'">
+                ⏰ Báo Giờ Back Mã
+              </button>
+              <button class="group-tab-btn" [class.active]="selectedPromoPostTab === 'high_value'" (click)="selectedPromoPostTab = 'high_value'">
+                ⚡ Bắn Nhanh Mã Khủng
+              </button>
+              <button class="group-tab-btn" [class.active]="selectedPromoPostTab === 'flat'" (click)="selectedPromoPostTab = 'flat'">
+                ✨ Deal 99K + Mẹo Xu
+              </button>
+            </div>
+          </div>
+
+          <!-- Preview & Action Container -->
+          <div style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start;">
+            <!-- Box Preview Nội dung bài viết -->
+            <div style="background: #090d16; border: 1px solid #1e293b; border-radius: 12px; padding: 18px; position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <span style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">
+                  <span *ngIf="selectedPromoPostTab === 'manual'">📄 Mẫu 1: Bài Danh Sách Mã Nhập Tay Kèm Link List Áp Dụng</span>
+                  <span *ngIf="selectedPromoPostTab === 'back'">⏰ Mẫu 2: Bài Báo Khung Giờ Back Mã & 2 Link Banner</span>
+                  <span *ngIf="selectedPromoPostTab === 'high_value'">⚡ Mẫu 3: Bài Bắn Nhanh Loạt Mã Khủng 25%</span>
+                  <span *ngIf="selectedPromoPostTab === 'flat'">✨ Mẫu 4: Bài Deal Đồng Giá 99K Kèm Mẹo Bật/Tắt Xu 0.1s</span>
+                </span>
+                <button class="btn-small" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 4px 10px; font-weight: 600; cursor: pointer;"
+                        (click)="copyPostText(
+                          selectedPromoPostTab === 'manual' ? promoGeneratedPosts?.post_manual_vouchers :
+                          (selectedPromoPostTab === 'back' ? promoGeneratedPosts?.post_voucher_back_alert :
+                          (selectedPromoPostTab === 'high_value' ? promoGeneratedPosts?.post_flash_high_value : promoGeneratedPosts?.post_flat_deal)),
+                          'Bài Khuyến Mại'
+                        )">
+                  📋 Sao Chép Nội Dung
+                </button>
+              </div>
+
+              <!-- Terminal Preview Box -->
+              <pre style="white-space: pre-wrap; font-family: 'Outfit', sans-serif; font-size: 0.9rem; color: #e2e8f0; line-height: 1.6; margin: 0; max-height: 380px; overflow-y: auto;">{{ 
+                selectedPromoPostTab === 'manual' ? promoGeneratedPosts?.post_manual_vouchers :
+                (selectedPromoPostTab === 'back' ? promoGeneratedPosts?.post_voucher_back_alert :
+                (selectedPromoPostTab === 'high_value' ? promoGeneratedPosts?.post_flash_high_value : promoGeneratedPosts?.post_flat_deal))
+              }}</pre>
+            </div>
+
+            <!-- Panel Thao Tác Bắn Tin Trực Tiếp -->
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px;">
+              <h4 style="margin: 0 0 12px 0; font-size: 0.98rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🚀</span> Bắn Tin & Đăng Bài Tự Động
+              </h4>
+              <p style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 16px; line-height: 1.4;">
+                Gửi bài đăng này trực tiếp tới Kênh Telegram hoặc đăng lên nhóm Facebook bạn chọn mà không cần mở ứng dụng.
+              </p>
+
+              <!-- Option Telegram -->
+              <div style="margin-bottom: 16px; padding: 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px;">
+                <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; margin-bottom: 6px;">1. Bắn Kênh Telegram:</div>
+                <button class="btn-primary" style="width: 100%; padding: 9px; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;"
+                        [disabled]="publishingPromo"
+                        (click)="publishPromoPost('TELEGRAM', 
+                          selectedPromoPostTab === 'manual' ? promoGeneratedPosts?.post_manual_vouchers :
+                          (selectedPromoPostTab === 'back' ? promoGeneratedPosts?.post_voucher_back_alert :
+                          (selectedPromoPostTab === 'high_value' ? promoGeneratedPosts?.post_flash_high_value : promoGeneratedPosts?.post_flat_deal))
+                        )">
+                  <span>📢</span> Bắn Ngay Lên Telegram
+                </button>
+              </div>
+
+              <!-- Option Facebook Group -->
+              <div style="padding: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px;">
+                <div style="font-weight: 700; color: #60a5fa; font-size: 0.85rem; margin-bottom: 6px;">2. Đăng Lên Facebook Group:</div>
+                <select [(ngModel)]="selectedGroupForPromo" style="width: 100%; padding: 8px; margin-bottom: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+                  <option value="">-- Chọn Nhóm Facebook --</option>
+                  <option *ngFor="let g of approvedGroups" [value]="g.group_id">
+                    {{ g.name }} ({{ g.category_name }})
+                  </option>
+                </select>
+                <button class="btn-action-green" style="width: 100%; padding: 9px; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;"
+                        [disabled]="publishingPromo || !selectedGroupForPromo"
+                        (click)="publishPromoPost('FB_GROUP', 
+                          selectedPromoPostTab === 'manual' ? promoGeneratedPosts?.post_manual_vouchers :
+                          (selectedPromoPostTab === 'back' ? promoGeneratedPosts?.post_voucher_back_alert :
+                          (selectedPromoPostTab === 'high_value' ? promoGeneratedPosts?.post_flash_high_value : promoGeneratedPosts?.post_flat_deal))
+                        )">
+                  <span>🚀</span> Đăng Bài Vào Nhóm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: QUẢN LÝ MÃ NHẬP TAY & CẤU HÌNH LINK CHIẾN DỊCH -->
+        <div style="display: grid; grid-template-columns: 1fr 400px; gap: 24px; align-items: start;">
+          <!-- Cột Trái: Bảng Quản Lý Mã Nhập Tay (Voucher Codes) -->
+          <div class="glass-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0; font-size: 1.1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🎟️</span> Danh Sách Mã Nhập Tay ({{ voucherCodes.length }} mã)
+              </h3>
+            </div>
+
+            <!-- Form Thêm Nhanh Mã Mới -->
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+              <div style="font-weight: 700; color: #38bdf8; font-size: 0.82rem; margin-bottom: 10px; text-transform: uppercase;">
+                ➕ Thêm Mã Nhập Tay Mới Vào Hệ Thống
+              </div>
+              <div style="display: grid; grid-template-columns: 140px 1fr 1fr auto; gap: 10px; align-items: center;">
+                <input type="text" [(ngModel)]="newVoucher.code" placeholder="Mã code (AFFNGAG)" style="padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem; font-family: monospace;">
+                <input type="text" [(ngModel)]="newVoucher.discount_desc" placeholder="Mô tả (giảm 79k/299k)" style="padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+                <input type="text" [(ngModel)]="newVoucher.apply_url" placeholder="Link áp dụng (https://...)" style="padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+                <button class="btn-primary" style="padding: 8px 14px; font-size: 0.82rem; white-space: nowrap; cursor: pointer;" (click)="saveVoucherCode()">
+                  ➕ Thêm
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Vouchers -->
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.75rem; text-transform: uppercase;">
+                    <th style="padding: 8px 10px;">Mã Code</th>
+                    <th style="padding: 8px 10px;">Mức Giảm & Điều Kiện</th>
+                    <th style="padding: 8px 10px;">Link List Áp Dụng</th>
+                    <th style="padding: 8px 10px; text-align: right;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let v of voucherCodes" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 10px 10px;">
+                      <span style="font-family: monospace; font-weight: 700; color: #fbbf24; background: rgba(245, 158, 11, 0.15); padding: 2px 6px; border-radius: 4px; cursor: pointer;"
+                            (click)="copyPostText(v.code, 'Mã ' + v.code)"
+                            title="Bấm để copy mã">
+                        {{ v.code }}
+                      </span>
+                    </td>
+                    <td style="padding: 10px 10px; color: #f1f5f9;">{{ v.discount_desc }}</td>
+                    <td style="padding: 10px 10px;">
+                      <a *ngIf="v.apply_url" [href]="v.apply_url" target="_blank" style="color: #38bdf8; text-decoration: none; font-size: 0.8rem; word-break: break-all;">
+                        {{ v.apply_url }} ↗
+                      </a>
+                      <span *ngIf="!v.apply_url" style="color: #64748b; font-style: italic;">Áp toàn sàn/lọc</span>
+                    </td>
+                    <td style="padding: 10px 10px; text-align: right;">
+                      <button class="btn-clear-table" style="padding: 3px 8px; font-size: 0.75rem;" (click)="deleteVoucherCode(v.id)">✕</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Cột Phải: Cấu Hình Link Chiến Dịch (Banner & Ví Voucher) -->
+          <div class="glass-card" style="padding: 24px;">
+            <h3 style="margin: 0 0 14px 0; font-size: 1.1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🔗</span> Link Chiến Dịch & Mẹo Săn Sale
+            </h3>
+            <p style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 16px;">
+              Các link này sẽ tự động được gắn vào mẫu bài viết báo giờ back mã và bài hướng dẫn săn sale.
+            </p>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Link Mở Ví Voucher (B1):</label>
+              <input type="text" [(ngModel)]="campaignLinks.wallet_url" style="width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Link Banner Săn Mã 1:</label>
+              <input type="text" [(ngModel)]="campaignLinks.banner_1_url" style="width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Link Banner Săn Mã 2 (Dễ kéo load):</label>
+              <input type="text" [(ngModel)]="campaignLinks.banner_2_url" style="width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Link Deal Đồng Giá 99K:</label>
+              <input type="text" [(ngModel)]="campaignLinks.flat_deal_url" style="width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.82rem;">
+            </div>
+
+            <button class="btn-save" style="width: 100%; padding: 10px; cursor: pointer;" (click)="saveCampaignLinks()">
+              💾 Lưu Cập Nhật Link Chiến Dịch
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2C: KHUYẾN MẠI, KHUNG GIỜ FLASH SALE & VOUCHER -->
+      <div *ngIf="dealsSubTab === 'promotions'">
+        <!-- Campaign Banner Card -->
+        <div class="glass-card" style="margin-bottom: 24px; padding: 24px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%); border: 1px solid rgba(239, 68, 68, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; color: #fca5a5; font-weight: 600; margin-bottom: 8px;">
+                <span>🔥</span> CHIẾN DỊCH HÔM NAY
+              </div>
+              <h2 style="margin: 0 0 6px 0; font-size: 1.5rem; color: #f8fafc; font-weight: 700;">
+                {{ promotionData?.campaign?.name || 'Đang tải thông tin chiến dịch...' }}
+              </h2>
+              <p style="margin: 0; color: #cbd5e1; font-size: 0.95rem;">
+                {{ promotionData?.campaign?.tagline }}
+              </p>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px;">Khung Giờ Sắp Tới:</div>
+              <div style="font-size: 1.8rem; font-weight: 800; color: #fbbf24; font-family: monospace;">
+                {{ promotionData?.upcoming_slot?.slot || '--:--' }}
+              </div>
+              <small style="color: #cbd5e1;">{{ promotionData?.upcoming_slot?.title }}</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 Columns Grid: Timeline Slots & Remind Config -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <!-- Timeline Flash Sale Slots -->
+          <div class="glass-card" style="padding: 24px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+              <span>⚡</span> Khung Giờ Flash Sale Hôm Nay
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div *ngFor="let s of promotionData?.slots" 
+                   style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: 10px; transition: all 0.2s;"
+                   [style.border]="s.status === 'ACTIVE' ? '1px solid rgba(34, 197, 94, 0.5)' : (s.status === 'UPCOMING' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)')"
+                   [style.background]="s.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.08)' : (s.status === 'UPCOMING' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)')">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <span style="font-size: 1.25rem; font-weight: 800; font-family: monospace; color: #f8fafc; min-width: 60px;">
+                    {{ s.slot }}
+                  </span>
+                  <div>
+                    <div style="font-weight: 600; color: #f1f5f9; font-size: 0.95rem;">{{ s.title }}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">{{ s.highlight }}</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span *ngIf="s.is_reminded_today" class="status-pill" style="background: rgba(147, 51, 234, 0.2); color: #d8b4fe; border: 1px solid rgba(147, 51, 234, 0.3);">
+                    ✓ Đã nhắc
+                  </span>
+                  <span class="status-pill" 
+                        [style.background]="s.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.2)' : (s.status === 'UPCOMING' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(148, 163, 184, 0.15)')"
+                        [style.color]="s.status === 'ACTIVE' ? '#4ade80' : (s.status === 'UPCOMING' ? '#60a5fa' : '#94a3b8')">
+                    {{ s.status === 'ACTIVE' ? 'Đang Diễn Ra' : (s.status === 'UPCOMING' ? 'Sắp Tới' : 'Đã Qua') }}
+                  </span>
+                  <button class="btn-table-link" style="padding: 4px 10px; font-size: 0.8rem;" (click)="triggerReminderNow(s.slot)">
+                    Bắn Bài Nhắc
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hẹn Giờ Nhắc & Bắn Bài Thủ Công -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Card Cấu Hình Hẹn Giờ -->
+            <div class="glass-card" style="padding: 24px;">
+              <h3 style="margin: 0 0 14px 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+                <span>⏰</span> Cấu Hình Hẹn Giờ Nhắc
+              </h3>
+              
+              <div class="schedule-switch" style="margin-bottom: 16px;">
+                <label class="switch-label">
+                  <input type="checkbox" [(ngModel)]="saleReminderConfig.enabled">
+                  <span class="slider"></span>
+                  <strong>Tự Động Bắn Bài Nhắc Sale</strong>
+                </label>
+                <small style="color: #94a3b8; display: block; margin-top: 4px;">Bot sẽ tự động gửi bài vào Telegram trước khi khung giờ sale mở</small>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="color: #cbd5e1; font-size: 0.9rem; margin-bottom: 6px; display: block;">Nhắc trước giờ sale (phút):</label>
+                <input type="number" min="5" max="120" [(ngModel)]="saleReminderConfig.remind_before_minutes" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff;">
+                <small style="color: #94a3b8; display: block; margin-top: 4px;">Khuyên dùng: 15 phút (Đủ để người mua vào lưu mã và bỏ giỏ hàng)</small>
+              </div>
+
+              <button class="btn-save" style="width: 100%;" (click)="savePromotionConfig()">
+                💾 Lưu Cài Đặt Nhắc Sale
+              </button>
+            </div>
+
+            <!-- Card Bắn Bài Ngay Lập Tức -->
+            <div class="glass-card" style="padding: 24px;">
+              <h3 style="margin: 0 0 10px 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+                <span>📢</span> Bắn Bài Nhắc Thủ Công
+              </h3>
+              <p style="margin: 0 0 14px 0; font-size: 0.85rem; color: #94a3b8;">
+                Soạn bài kèm mã voucher và gửi ngay lập tức tới Kênh Telegram:
+              </p>
+
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label style="color: #cbd5e1; font-size: 0.9rem; margin-bottom: 6px; display: block;">Chọn khung giờ:</label>
+                <select [(ngModel)]="selectedReminderSlot" style="width: 100%; padding: 10px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff;">
+                  <option *ngFor="let s of promotionData?.slots" [value]="s.slot">
+                    {{ s.slot }} - {{ s.title }}
+                  </option>
+                </select>
+              </div>
+
+              <button class="btn-primary" style="width: 100%;" [disabled]="sendingReminder" (click)="triggerReminderNow()">
+                {{ sendingReminder ? 'Đang gửi...' : '🚀 Bắn Bài Nhắc Ngay Vào Telegram' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vouchers List Card -->
+        <div class="glass-card" style="padding: 24px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+            <span>🎟️</span> Danh Sách Mã Giảm Giá & Voucher Độc Quyền Hôm Nay
+          </h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+            <div *ngFor="let v of promotionData?.vouchers" 
+                 style="padding: 16px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="display: inline-block; padding: 2px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.2); color: #93c5fd; font-size: 0.75rem; font-weight: 600; margin-bottom: 6px;">
+                  {{ v.badge }}
+                </div>
+                <div style="font-weight: 700; color: #fbbf24; font-size: 1.1rem; font-family: monospace;">
+                  {{ v.code }}
+                </div>
+                <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 4px;">
+                  {{ v.desc }}
+                </div>
+              </div>
+              <div style="margin-left: 12px;">
+                <span style="display: inline-block; padding: 6px 12px; border-radius: 20px; background: rgba(34, 197, 94, 0.15); color: #4ade80; font-size: 0.8rem; font-weight: 600;">
+                  Sẵn Sàng
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- HUB 3: TIẾP THỊ & LAN TỎA FACEBOOK (MARKETING) -->
+    <!-- ============================================== -->
+    <section class="content-body" *ngIf="activeTab === 'marketing'">
+      <!-- Subnav Bar -->
+      <div class="subnav-bar">
+        <button class="subnav-pill" [class.active]="marketingSubTab === 'social_copilot'" (click)="setMarketingSubTab('social_copilot')">
+          <span>🚀 Trợ Lý Lan Tỏa MXH (Social Copilot)</span>
+        </button>
+        <button class="subnav-pill" [class.active]="marketingSubTab === 'posts'" (click)="setMarketingSubTab('posts')">
+          <span>✍️ Soạn Bài & Tạo Ảnh Tiêu Đề</span>
+        </button>
+        <button class="subnav-pill" [class.active]="marketingSubTab === 'seeding'" (click)="setMarketingSubTab('seeding')">
+          <span>💬 Gieo Bình Luận Seeding</span>
+        </button>
+        <button class="subnav-pill" [class.active]="marketingSubTab === 'groups'" (click)="setMarketingSubTab('groups')">
+          <span>👥 Quản Lý Nhóm & Lịch Sử Đăng ({{ groups.length }})</span>
+        </button>
+      </div>
+
+      <!-- SUBTAB 3A: TRỢ LÝ LAN TỎA MẠNG XÃ HỘI (SOCIAL OUTREACH COPILOT) -->
+      <div *ngIf="marketingSubTab === 'social_copilot'">
+        <!-- Hero Header -->
+        <div class="glass-card" style="margin-bottom: 24px; padding: 24px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 100%); border: 1px solid rgba(168, 85, 247, 0.35);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; color: #d8b4fe; font-weight: 600; margin-bottom: 8px;">
+                <span>🚀</span> TRỢ LÝ LAN TỎA MXH CHO PUBLISHER CHƯA CÓ NHÓM RIÊNG
+              </div>
+              <h2 style="margin: 0 0 6px 0; font-size: 1.45rem; color: #f8fafc; font-weight: 700;">
+                Đẩy Link Trực Tiếp Tới Người Dùng Trên Facebook, Threads & MXH
+              </h2>
+              <p style="margin: 0; color: #cbd5e1; font-size: 0.92rem; max-width: 900px; line-height: 1.5;">
+                Giải quyết bài toán tiếp cận khi chưa sở hữu cộng đồng riêng: Đóng gói bài đăng tự nhiên (Review thật, Deal 1K kích hoạt cookie 7 ngày, So sánh giá 2 sàn, Báo động Flash sale), tích hợp <b>DeepLink mở thẳng ứng dụng Shopee/Lazada</b> vượt Webview Facebook và quy trình Semi-Auto an toàn tài khoản 100%.
+              </p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <div style="padding: 10px 16px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 12px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #94a3b8;">Cơ Chế Bảo Vệ</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #34d399;">🛡️ Semi-Auto Safe</div>
+              </div>
+              <div style="padding: 10px 16px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 12px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #94a3b8;">Chống Kẹt Webview</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">📱 Mobile DeepLink</div>
+              </div>
+              <div style="padding: 10px 16px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 12px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #94a3b8;">Chiến Lược Cookie</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #fbbf24;">🍪 Ghim 7 Ngày</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layout 2 Cột: Cột Trái (Chọn Deal & Chiến Lược) | Cột Phải (Thành Phẩm Caption & Điều Khiển 1-Click) -->
+        <div class="social-copilot-grid">
+          
+          <!-- CỘT TRÁI: DEAL & GÓC TIẾP CẬN -->
+          <div class="social-left-col">
+            <!-- 1. Chọn Sản Phẩm Đẩy Link -->
+            <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h3 style="margin: 0; font-size: 1.1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                  <span>🛒</span> 1. Chọn Sản Phẩm Đẩy Link
+                </h3>
+                <span style="font-size: 0.8rem; color: #94a3b8;">{{ deals.length }} deal sẵn có</span>
+              </div>
+
+              <!-- Search box -->
+              <div style="margin-bottom: 14px;">
+                <input type="text" [(ngModel)]="socialSearchTerm" placeholder="🔍 Tìm deal theo tên hoặc ngành hàng..." 
+                       style="width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; box-sizing: border-box;">
+              </div>
+
+              <!-- Deal đã chọn hiện tại -->
+              <div *ngIf="selectedSocialDeal" style="background: rgba(15, 23, 42, 0.8); border: 1px solid #4f46e5; border-radius: 12px; padding: 12px; display: flex; gap: 14px; align-items: center; margin-bottom: 14px;">
+                <img [src]="getDealImageUrl(selectedSocialDeal)" [alt]="selectedSocialDeal.name" 
+                     style="width: 68px; height: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #334155; flex-shrink: 0;"
+                     (error)="onImageError($event, selectedSocialDeal)">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
+                    <span [style.background]="selectedSocialDeal.platform === 'LAZADA' ? '#0284c7' : '#ea580c'" 
+                          style="color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                      {{ selectedSocialDeal.platform === 'LAZADA' ? 'Lazada' : 'Shopee' }}
+                    </span>
+                    <span *ngIf="selectedSocialDeal.price_badge === 'LOSS_LEADER_1K'" style="background: #dc2626; color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                      🎯 Deal Mồi 1K
+                    </span>
+                    <span *ngIf="selectedSocialDeal.commission_rate > 0 || selectedSocialDeal.is_extra" style="background: #d97706; color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                      💰 HH {{ selectedSocialDeal.commission_rate || 15 }}% {{ selectedSocialDeal.is_extra ? '(Xtra)' : '' }}
+                    </span>
+                  </div>
+                  <div style="color: #f1f5f9; font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" [title]="selectedSocialDeal.name">
+                    {{ selectedSocialDeal.name }}
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
+                    <span style="color: #ef4444; font-weight: 700; font-size: 1rem;">{{ selectedSocialDeal.price_sale | number }}đ</span>
+                    <span style="color: #64748b; font-size: 0.78rem; text-decoration: line-through;" *ngIf="selectedSocialDeal.price_original > selectedSocialDeal.price_sale">
+                      {{ selectedSocialDeal.price_original | number }}đ
+                    </span>
+                    <span style="color: #10b981; font-size: 0.78rem;">-{{ selectedSocialDeal.discount_percent }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Danh sách Deal nhanh có thể chọn -->
+              <div style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+                <div *ngFor="let d of filteredDealsForSocial.slice(0, 10)" 
+                     (click)="selectDealForSocial(d)"
+                     [style.background]="selectedSocialDeal?.item_id === d.item_id ? 'rgba(79, 70, 229, 0.25)' : 'rgba(30, 41, 59, 0.4)'"
+                     [style.border-color]="selectedSocialDeal?.item_id === d.item_id ? '#6366f1' : '#334155'"
+                     style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid; border-radius: 8px; cursor: pointer; transition: all 0.15s ease;">
+                  <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                    <span style="font-size: 0.9rem;">{{ d.platform === 'LAZADA' ? '🔵' : '🟠' }}</span>
+                    <span style="font-size: 0.82rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" [title]="d.name">
+                      {{ d.name }}
+                    </span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    <span style="font-size: 0.75rem; color: #fca5a5; font-weight: 600;">{{ d.price_sale | number }}đ</span>
+                    <span *ngIf="d.price_badge === 'LOSS_LEADER_1K'" style="font-size: 0.68rem; background: #dc2626; color: #fff; padding: 1px 4px; border-radius: 4px;">1K</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Chọn Góc Tiếp Cận MXH (Strategy Angles) -->
+            <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+              <h3 style="margin: 0 0 14px 0; font-size: 1.1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🎯</span> 2. Chọn Góc Tiếp Cận (Tránh Bộ Lọc Spam)
+              </h3>
+
+              <div class="angle-selection-grid">
+                <!-- Angle 1: Review Thật -->
+                <div class="angle-card" [class.active]="selectedSocialAngle === 'review'" (click)="setSocialAngle('review')">
+                  <div class="angle-header">
+                    <span class="angle-badge">⭐ Review Cá Nhân</span>
+                    <span class="angle-tag green">Admin Thích</span>
+                  </div>
+                  <div class="angle-desc">Đóng vai người mua pass lại hoặc trải nghiệm thật. Tự nhiên 100%, không bị coi là seeding/spam link.</div>
+                </div>
+
+                <!-- Angle 2: Deal 1K Mồi Cookie -->
+                <div class="angle-card" [class.active]="selectedSocialAngle === 'loss_leader'" (click)="setSocialAngle('loss_leader')">
+                  <div class="angle-header">
+                    <span class="angle-badge">💥 Deal Mồi 1K Freeship</span>
+                    <span class="angle-tag red">Ghim Cookie 7D</span>
+                  </div>
+                  <div class="angle-desc">Hút người xem bấm link chớp đơn rẻ 1K. Kích hoạt cookie Shopee 7 ngày để ăn hoa hồng mọi đơn sau đó!</div>
+                </div>
+
+                <!-- Angle 3: So Sánh Giá 2 Sàn -->
+                <div class="angle-card" [class.active]="selectedSocialAngle === 'price_compare'" (click)="setSocialAngle('price_compare')">
+                  <div class="angle-header">
+                    <span class="angle-badge">⚖️ Shopee vs Lazada</span>
+                    <span class="angle-tag blue">Thảo Luận Cao</span>
+                  </div>
+                  <div class="angle-desc">So sánh chênh lệch giá giữa 2 sàn, kéo cmt tranh luận và cung cấp link cả Shopee + Lazada.</div>
+                </div>
+
+                <!-- Angle 4: Báo Động Flash Sale -->
+                <div class="angle-card" [class.active]="selectedSocialAngle === 'flash_sale'" (click)="setSocialAngle('flash_sale')">
+                  <div class="angle-header">
+                    <span class="angle-badge">⚡ Báo Động Giờ Vàng</span>
+                    <span class="angle-tag yellow">Tạo FOMO</span>
+                  </div>
+                  <div class="angle-desc">Cảnh báo khung giờ vàng chuẩn bị hết suất trợ giá. Thúc ép khách click chốt đơn ngay lập tức.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Kênh Phân Phối Mục Tiêu -->
+            <div class="glass-card" style="padding: 20px;">
+              <h3 style="margin: 0 0 14px 0; font-size: 1.1rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>📢</span> 3. Kênh Phân Phối Mục Tiêu
+              </h3>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="channel-pill-btn" [class.active]="selectedSocialChannel === 'fb_feed'" (click)="setSocialChannel('fb_feed')">
+                  <span>🔵 Bài Đăng FB Group</span>
+                </button>
+                <button class="channel-pill-btn" [class.active]="selectedSocialChannel === 'fb_comment'" (click)="setSocialChannel('fb_comment')">
+                  <span>💬 Bình Luận Dạo / Seeding</span>
+                </button>
+                <button class="channel-pill-btn" [class.active]="selectedSocialChannel === 'social'" (click)="setSocialChannel('social')">
+                  <span>🌐 Threads / TikTok / Insta</span>
+                </button>
+                <button class="channel-pill-btn" [class.active]="selectedSocialChannel === 'fb_profile'" (click)="setSocialChannel('fb_profile')">
+                  <span>👤 Trang Cá Nhân / Story</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CỘT PHẢI: BÀI ĐĂNG ĐÃ ĐÓNG GÓI & THAO TÁC 1-CLICK -->
+          <div class="social-right-col">
+            <!-- Box Link Sản Phẩm Trực Tiếp -->
+            <div class="glass-card" style="padding: 20px; margin-bottom: 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 95, 70, 0.15) 100%); border: 1px solid rgba(16, 185, 129, 0.35);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.2rem;">🔗</span>
+                  <div>
+                    <h4 style="margin: 0; font-size: 1rem; color: #6ee7b7; font-weight: 700;">Link Trực Tiếp Vào Sản Phẩm (Chế Độ Thử Nghiệm)</h4>
+                    <span style="font-size: 0.78rem; color: #94a3b8;">Link tiếp thị trực tiếp của sàn (Shopee / Lazada), người bấm chuyển thẳng vào trang mua ngay</span>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn-copy-sm" (click)="copySocialShortLink()">
+                    📋 Copy Link Sàn
+                  </button>
+                  <a [href]="socialGeneratedPack?.target_link || selectedSocialDeal?.aff_url || selectedSocialDeal?.item_url" target="_blank" class="btn-preview-sm" title="Mở trực tiếp sản phẩm trên sàn">
+                    ↗️ Mở Thử
+                  </a>
+                </div>
+              </div>
+              <div style="background: #0f172a; border: 1px dashed #334155; border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 0.82rem; color: #38bdf8; word-break: break-all; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <span>{{ socialGeneratedPack?.target_link || selectedSocialDeal?.aff_url || selectedSocialDeal?.item_url || 'Đang tải link...' }}</span>
+                <span style="font-size: 0.75rem; color: #10b981; font-weight: 600; white-space: nowrap;">⚡ Direct Link Mode</span>
+              </div>
+            </div>
+
+            <!-- Box Caption Soạn Sẵn -->
+            <div class="glass-card" style="padding: 20px; margin-bottom: 20px; display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.1rem;">✍️</span>
+                  <h4 style="margin: 0; font-size: 1.05rem; color: #f8fafc; font-weight: 700;">
+                    Nội Dung Bài Đăng Hoàn Chỉnh (Kèm Link & Hashtag)
+                  </h4>
+                </div>
+                <button class="btn-primary" (click)="copySocialCaption()" style="padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                  <span>📋 Sao Chép Bài Viết (1-Click)</span>
+                </button>
+              </div>
+
+              <!-- Mẹo vị trí đặt link theo channel -->
+              <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.82rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
+                <span>💡</span>
+                <span>{{ socialGeneratedPack?.tip || 'Mẹo: Nhóm kiểm duyệt gắt $\rightarrow$ Đăng bài không link, dán link vào Bình luận đầu tiên để không bị bot Facebook bóp tương tác!' }}</span>
+              </div>
+
+              <!-- Textarea Caption -->
+              <div style="position: relative;">
+                <div *ngIf="loadingSocialPack" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.75); display: flex; align-items: center; justify-content: center; border-radius: 8px; z-index: 10;">
+                  <div style="color: #a855f7; font-size: 0.9rem; font-weight: 600;">⏳ Đang tạo gói nội dung...</div>
+                </div>
+                <textarea rows="11" readonly style="width: 100%; box-sizing: border-box; background: #0b1120; border: 1px solid #1e293b; border-radius: 8px; padding: 14px; font-size: 0.88rem; line-height: 1.55; color: #f1f5f9; resize: vertical; font-family: inherit;">{{ socialGeneratedPack?.caption }}</textarea>
+              </div>
+            </div>
+
+            <!-- Box Điều Khiển Mở Nhóm & Đăng Bằng Trình Duyệt Thật -->
+            <div class="glass-card" style="padding: 20px; background: linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, rgba(180, 83, 9, 0.15) 100%); border: 1px solid rgba(245, 158, 11, 0.35);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <h4 style="margin: 0 0 4px 0; font-size: 1.05rem; color: #fde047; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <span>👥</span> 4. Chọn Nhóm Facebook Mục Tiêu & Đăng Ngay
+                  </h4>
+                  <span style="font-size: 0.8rem; color: #cbd5e1;">Cơ chế Semi-Auto: Vừa mở nhóm FB trên tab thật của bạn, vừa tự động copy bài viết vào Clipboard!</span>
+                </div>
+                <a [href]="getDealImageUrl(selectedSocialDeal)" target="_blank" download="deal_banner.jpg" class="btn-table-link" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                  ⬇️ Tải Ảnh Kèm Bài
+                </a>
+              </div>
+
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 240px;">
+                  <select [(ngModel)]="selectedTargetFbGroup" style="width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-size: 0.88rem;">
+                    <option [ngValue]="null">-- Chọn nhóm Facebook muốn đăng bài ({{ groups.length }} nhóm đã lưu) --</option>
+                    <option *ngFor="let g of groups" [ngValue]="g">
+                      {{ g.name }} ({{ g.category_name || 'Tổng hợp' }} - {{ g.members_count | number }} mem)
+                    </option>
+                  </select>
+                </div>
+
+                <button class="btn-action-primary" (click)="openTargetFbGroupDirectly()" [disabled]="!selectedTargetFbGroup" style="padding: 10px 20px; font-size: 0.9rem; font-weight: 700; border-radius: 8px; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);">
+                  <span>🚀</span>
+                  <span>Mở Nhóm & Tự Copy Bài Đăng</span>
+                </button>
+              </div>
+
+              <!-- Dòng nhắc nhở quy trình 3 bước -->
+              <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: #94a3b8;">
+                <div><b style="color: #fde047;">Bước 1:</b> Bấm nút "Mở Nhóm & Tự Copy Bài"</div>
+                <div><b style="color: #fde047;">Bước 2:</b> Nhấn <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">Ctrl + V</kbd> dán bài vào nhóm</div>
+                <div><b style="color: #fde047;">Bước 3:</b> Thêm ảnh và bấm Đăng (Dưới 5 giây, an toàn 100%)</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 3A: SOẠN BÀI VIẾT & TẠO ẢNH TIÊU ĐỀ/COLLAGE -->
+      <div *ngIf="marketingSubTab === 'posts'">
+        <div class="glass-card" style="padding: 24px; margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.25rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🎨</span> Bộ Công Cụ Tạo Ảnh Bài Đăng Chuẩn Facebook
+              </h3>
+              <p style="margin: 0; font-size: 0.85rem; color: #94a3b8;">
+                Tự động tạo ảnh bìa tiêu đề 1080x1080 sắc nét hoặc ghép 4 deal (2x2 Mega Collage Grid) kèm link PR nhóm riêng.
+              </p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn-primary" [disabled]="generatingHeaderBanner" (click)="generateHeaderBanner()">
+                {{ generatingHeaderBanner ? '⏳ Đang tạo ảnh...' : '🎨 Tạo Lại Ảnh Tiêu Đề Hôm Nay' }}
+              </button>
+              <button class="btn-table-link" [disabled]="generatingCollage" (click)="generateCollage()" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 8px;">
+                {{ generatingCollage ? '⏳ Đang ghép...' : '🖼️ Tạo Ảnh Ghép 4 Deal (Collage)' }}
+              </button>
+              <a [href]="headerBannerImageUrl" target="_blank" download="daily_deal_header_banner.jpg" class="btn-action" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                ⬇️ Tải Ảnh Bìa
+              </a>
+            </div>
+          </div>
+
+          <!-- Banner Tiêu Đề Preview -->
+          <div style="display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; background: rgba(15, 23, 42, 0.6); padding: 18px; border-radius: 14px; border: 1px solid #334155;">
+            <div style="width: 200px; height: 200px; border-radius: 12px; overflow: hidden; border: 2px solid #f59e0b; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+              <img [src]="headerBannerImageUrl" alt="Ảnh Tiêu Đề Deal Ngày Hôm Nay" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div style="flex: 1; min-width: 260px;">
+              <div style="display: inline-block; background: #ee4d2d; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px;">
+                ẢNH TIÊU ĐỀ BẢN TIN CHUẨN 1080x1080
+              </div>
+              <h4 style="margin: 0 0 8px 0; font-size: 1.1rem; color: #f1f5f9;">Ảnh Bìa: Tổng Hợp Deal Sốc & Mã Săn Sale Hôm Nay</h4>
+              <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
+                Ảnh bìa thiết kế tự động, ghi rõ ngày tháng, các khung giờ săn sale và cam kết giảm giá thật. Giúp bài đăng trên Facebook chuyên nghiệp và thu hút tương tác tối đa!
+              </p>
+              <div style="font-size: 0.8rem; color: #38bdf8;">
+                💡 <b>Cách đăng:</b> Tải ảnh này lên làm ảnh đại diện bài viết $\rightarrow$ Copy nội dung bài dưới đây $\rightarrow$ Đăng lên Group Facebook!
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Định Dạng Bài Đăng Mẫu -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px;">
+            <!-- Format 1: Bài Tổng Hợp Deal Sốc -->
+            <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 12px; padding: 18px; display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-weight: 700; color: #f97316; font-size: 0.95rem;">🔥 1. Bản Tin Mega Deal Sốc</span>
+                <button class="btn-copy" (click)="copyPostText(generalPosts?.post_roundup, 'Bản Tin Mega Deal')">📋 Sao Chép Bài</button>
+              </div>
+              <textarea readonly rows="10" style="width: 100%; flex: 1; background: #0f172a; color: #e2e8f0; border: 1px solid #1e293b; border-radius: 8px; padding: 10px; font-size: 0.8rem; line-height: 1.4; resize: vertical;">{{ generalPosts?.post_roundup }}</textarea>
+            </div>
+
+            <!-- Format 2: Lịch Khung Giờ Mở Mã -->
+            <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 12px; padding: 18px; display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-weight: 700; color: #fbbf24; font-size: 0.95rem;">⏰ 2. Lịch 6 Khung Giờ Vàng</span>
+                <button class="btn-copy" (click)="copyPostText(generalPosts?.post_schedule, 'Lịch Săn Sale Khung Giờ')">📋 Sao Chép Bài</button>
+              </div>
+              <textarea readonly rows="10" style="width: 100%; flex: 1; background: #0f172a; color: #e2e8f0; border: 1px solid #1e293b; border-radius: 8px; padding: 10px; font-size: 0.8rem; line-height: 1.4; resize: vertical;">{{ generalPosts?.post_schedule }}</textarea>
+            </div>
+
+            <!-- Format 3: Cẩm Nang Bí Kíp Săn Sale -->
+            <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 12px; padding: 18px; display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-weight: 700; color: #34d399; font-size: 0.95rem;">💡 3. Bí Kíp Chồng 3 Tầng Mã</span>
+                <button class="btn-copy" (click)="copyPostText(generalPosts?.post_tips, 'Cẩm Nang Bí Kíp')">📋 Sao Chép Bài</button>
+              </div>
+              <textarea readonly rows="10" style="width: 100%; flex: 1; background: #0f172a; color: #e2e8f0; border: 1px solid #1e293b; border-radius: 8px; padding: 10px; font-size: 0.8rem; line-height: 1.4; resize: vertical;">{{ generalPosts?.post_tips }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 3B: GIEO BÌNH LUẬN SEEDING TỰ ĐỘNG -->
+      <div *ngIf="marketingSubTab === 'seeding'">
+        <!-- Action Card: Seeding Trực Tiếp -->
+        <div class="action-banner glass-card" style="margin-bottom: 24px;">
+          <div class="banner-content">
+            <h3>Tự Động Quét Bài Viết & Gieo Bình Luận Đề Xuất Deal</h3>
+            <p>Hệ thống tự động phát hiện bài đăng xin link, hỏi mua trong các nhóm Facebook đã tham gia và soạn câu trả lời thân thiện kèm link trung gian Anti-Ban.</p>
+          </div>
+          <button class="btn-primary" [disabled]="seedingLoading" (click)="triggerCommentSeeding()">
+            {{ seedingLoading ? '⏳ Đang quét & gieo...' : '🌱 Kích Hoạt Gieo Seeding Ngay' }}
+          </button>
+        </div>
+
+        <!-- LIVE SEEDING TERMINAL CONSOLE -->
+        <div class="seeding-terminal-card" style="margin-bottom: 24px;">
+          <div class="terminal-header">
+            <div class="terminal-title">
+              <span class="terminal-dot"></span>
+              <span>Nhật Ký Quét & Seeding Facebook Thực Tế (Live Console)</span>
+              <small style="color: #64748b; font-weight: normal; font-size: 0.75rem;">logs/facebook_seeding.log</small>
+            </div>
+            <div class="terminal-controls">
+              <button class="terminal-btn" [class.active]="autoRefreshSeedingLogs" (click)="autoRefreshSeedingLogs = !autoRefreshSeedingLogs">
+                <span>{{ autoRefreshSeedingLogs ? '🟢 Tự Động Nạp (5s)' : '⚪ Tạm Dừng Nạp' }}</span>
+              </button>
+              <button class="terminal-btn" (click)="fetchSeedingLogs()">
+                <span>🔄 Nạp Lại</span>
+              </button>
+              <button class="terminal-btn" style="color: #f87171;" (click)="clearSeedingLogs()">
+                <span>🗑️ Xóa Log</span>
+              </button>
+            </div>
+          </div>
+          <div class="terminal-body" id="seedingTerminalBody">
+{{ seedingLogsContent }}
+          </div>
+        </div>
+
+        <!-- Seeding History List -->
+        <div class="glass-card" style="padding: 24px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <span>💬</span> Nhật Ký Bình Luận Seeding Đã Gieo ({{ seedingHistory.length }})
+          </h3>
+          <div style="max-height: 480px; overflow-y: auto;" *ngIf="seedingHistory.length > 0; else noSeeding">
+            <div *ngFor="let s of seedingHistory" style="padding: 14px; margin-bottom: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px;">
+                <span style="color: #60a5fa; font-weight: 600;">👥 {{ s.group_name || ('Group ' + s.group_id) }}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <a *ngIf="s.target_post_url" [href]="s.target_post_url" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 600; font-size: 0.75rem;">🔗 Mở bài viết FB ↗</a>
+                  <span>{{ s.posted_at }}</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <img [src]="backendBaseUrl + '/api/deals/image/' + s.item_id" referrerpolicy="no-referrer" (error)="$any($event.target).style.display='none'" style="width: 70px; height: 70px; border-radius: 8px; object-fit: cover; border: 1px solid #334155; flex-shrink: 0;" alt="Ảnh sản phẩm">
+                <div style="flex: 1;">
+                  <div style="font-size: 0.8rem; color: #fbbf24; font-weight: 600; margin-bottom: 4px;" *ngIf="s.deal_name">🛍️ {{ s.deal_name }}</div>
+                  <p style="margin: 0; font-size: 0.85rem; color: #e2e8f0; line-height: 1.4;">{{ s.comment_text }}</p>
+                  <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a [href]="backendBaseUrl + '/api/deals/image/' + s.item_id" target="_blank" download class="btn-copy" style="display: inline-block; font-size: 0.75rem; padding: 4px 10px; background: #0284c7; color: #fff; text-decoration: none; border-radius: 6px;">📸 Tải ảnh</a>
+                    <button class="btn-copy" (click)="copyCommentText(s.comment_text)" style="font-size: 0.75rem; padding: 4px 10px; background: rgba(255,255,255,0.08); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; cursor: pointer;">📋 Sao Chép Bình Luận</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ng-template #noSeeding>
+            <div style="color: #94a3b8; font-style: italic; padding: 12px 0;">Chưa có bình luận seeding nào. Bấm nút "Kích Hoạt Gieo Seeding Ngay" ở trên để chạy thử!</div>
+          </ng-template>
+        </div>
+      </div>
+
+      <!-- SUBTAB 3C: QUẢN LÝ NHÓM & LỊCH SỬ ĐĂNG BÀI -->
+      <div *ngIf="marketingSubTab === 'groups'">
+        <!-- KPI Stats Summary for Groups -->
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-green">🟢</div>
+            <div class="stat-details">
+              <span class="stat-label">Nhóm Đã Tham Gia</span>
+              <h3 class="stat-number">{{ approvedGroups.length }}</h3>
+              <small class="stat-sub">Sẵn sàng đăng bài & seeding</small>
+            </div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-cyan">🔍</div>
+            <div class="stat-details">
+              <span class="stat-label">Nhóm Mới Dò Tìm</span>
+              <h3 class="stat-number">{{ discoveredGroups.length }}</h3>
+              <small class="stat-sub">Tìm thấy theo từ khóa ngành hàng</small>
+            </div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-orange">🟡</div>
+            <div class="stat-details">
+              <span class="stat-label">Nhóm Đang Chờ Duyệt</span>
+              <h3 class="stat-number">{{ pendingGroups.length }}</h3>
+              <small class="stat-sub">Đã gửi yêu cầu gia nhập</small>
+            </div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-purple">🌐</div>
+            <div class="stat-details">
+              <span class="stat-label">Tổng Cộng Trong CSDL</span>
+              <h3 class="stat-number">{{ groups.length }}</h3>
+              <small class="stat-sub">Nhóm Facebook quản lý</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gradual Auto-Poster Control Card -->
+        <div class="glass-card" style="margin-bottom: 24px; padding: 24px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(249, 115, 22, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.25rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🚀</span> Tự Động Đăng Bài Dần Vào Nhóm (Gradual Auto-Poster)
+              </h3>
+              <p style="margin: 0; font-size: 0.85rem; color: #cbd5e1; max-width: 750px;">
+                Hệ thống tự động khớp Deal hời từ kho theo đúng ngành hàng của nhóm (Thời trang nam, nữ, công nghệ, săn sale 1K) và đăng bài dần dần với khoảng nghỉ an toàn chống spam/checkpoint của Facebook.
+              </p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button *ngIf="!gradualPostingState.is_running" class="btn-primary" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 10px 20px; font-weight: 700; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);" (click)="startGradualPosting()">
+                ▶ Bắt Đầu Đăng Bài Dần
+              </button>
+              <button *ngIf="gradualPostingState.is_running" class="btn-action danger" style="padding: 10px 18px; font-weight: 700;" (click)="stopGradualPosting()">
+                ⏹ Dừng Chu Trình
+              </button>
+              <button class="btn-table-link" (click)="autoCategorizeGroups()" title="Tự động phân loại 23 nhóm theo ngành hàng">
+                🏷️ Phân Loại Ngành Hàng
+              </button>
+            </div>
+          </div>
+
+          <!-- Configuration Controls -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 16px; background: rgba(0, 0, 0, 0.25); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 16px;">
+            <div>
+              <label style="color: #94a3b8; font-size: 0.8rem; display: block; margin-bottom: 6px;">Số lượng nhóm mục tiêu mỗi phiên:</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" min="1" max="25" [(ngModel)]="gradualMaxGroups" style="width: 80px; padding: 6px 10px; border-radius: 6px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; font-weight: 700;">
+                <span style="color: #cbd5e1; font-size: 0.85rem;">nhóm (ưu tiên chưa đăng)</span>
+              </div>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.8rem; display: block; margin-bottom: 6px;">Khoảng nghỉ an toàn giữa các bài:</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" min="30" max="900" [(ngModel)]="gradualDelaySeconds" style="width: 80px; padding: 6px 10px; border-radius: 6px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; font-weight: 700;">
+                <span style="color: #cbd5e1; font-size: 0.85rem;">giây (~{{ (gradualDelaySeconds / 60) | number:'1.1-1' }} phút)</span>
+              </div>
+            </div>
+
+            <div>
+              <label style="color: #94a3b8; font-size: 0.8rem; display: block; margin-bottom: 6px;">Cơ chế khớp Deal:</label>
+              <div style="color: #38bdf8; font-size: 0.85rem; font-weight: 600; margin-top: 4px;">
+                🎯 Smart Niche Matcher (100% đúng chủ đề)
+              </div>
+            </div>
+          </div>
+
+          <!-- Deal Inventory by Category -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 14px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); align-items: center;">
+            <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">
+              📦 Kho deal chuẩn ngành:
+            </span>
+            <span class="status-pill" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.8rem;">
+              👔 Nam: <strong>{{ categoryInventory['Thời Trang Nam'] || 0 }}</strong>
+            </span>
+            <span class="status-pill" style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); font-size: 0.8rem;">
+              👗 Nữ: <strong>{{ categoryInventory['Thời Trang Nữ'] || 0 }}</strong>
+            </span>
+            <span class="status-pill" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.8rem;">
+              📱 Điện Tử: <strong>{{ categoryInventory['Thiết Bị Điện Tử'] || 0 }}</strong>
+            </span>
+            <span class="status-pill" style="background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); font-size: 0.8rem;">
+              ⚡ Săn Deal: <strong>{{ categoryInventory['Săn Deal Tổng Hợp'] || 0 }}</strong>
+            </span>
+            <span class="status-pill" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.8rem;">
+              🏠 Gia Dụng: <strong>{{ categoryInventory['Nhà Cửa & Đời Sống'] || 0 }}</strong>
+            </span>
+          </div>
+
+          <!-- Live Progress Status Bar -->
+          <div *ngIf="gradualPostingState.is_running" style="padding: 12px 16px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="status-dot-pulse" style="width: 10px; height: 10px; background: #38bdf8; border-radius: 50%; display: inline-block;"></span>
+              <span style="color: #f1f5f9; font-size: 0.9rem;">
+                <strong>Đang đăng dần:</strong> Đã hoàn tất <strong>{{ gradualPostingState.completed }} / {{ gradualPostingState.total_target }}</strong> nhóm. 
+                Đang xử lý: <span style="color: #fbbf24;">[{{ gradualPostingState.current_group }}]</span>
+              </span>
+            </div>
+            <div style="color: #94a3b8; font-size: 0.85rem;" *ngIf="gradualPostingState.next_post_time">
+              ⏳ Đợt đăng tiếp theo dự kiến lúc: <strong style="color: #4ade80;">{{ gradualPostingState.next_post_time }}</strong>
+            </div>
+          </div>
+
+          <div *ngIf="!gradualPostingState.is_running && gradualPostingState.status === 'FINISHED'" style="padding: 12px 16px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; color: #4ade80; font-size: 0.9rem;">
+            🎉 Phiên đăng bài dần vừa qua đã hoàn thành! Đã đăng thành công vào {{ gradualPostingState.completed }} nhóm. Bạn có thể xem link bài viết trong bảng Lịch Sử bên dưới.
+          </div>
+        </div>
+
+        <!-- Action Toolbar Card -->
+        <div class="glass-card" style="margin-bottom: 24px; padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <button class="btn-sync-groups" [disabled]="syncingGroups" (click)="syncJoinedGroups()">
+              <span>{{ syncingGroups ? '⏳ Đang quét Facebook...' : '🔄 Đồng Bộ Nhóm Đã Tham Gia Từ Facebook' }}</span>
+            </button>
+            <button class="btn-primary" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 8px 16px;" (click)="openAddGroupModal()">
+              <span>➕ Thêm Nhóm Thủ Công</span>
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn-table-link" (click)="fetchGroups()">🔄 Nạp Lại</button>
+            <button class="btn-clear-table" *ngIf="groups.length > 0" (click)="clearGroups()">🗑️ Xóa Toàn Bộ Nhóm</button>
+          </div>
+        </div>
+
+        <!-- Filter Navigation Tabs -->
+        <div class="group-tabs-nav" style="margin-bottom: 14px;">
+          <button class="group-tab-btn" [class.active]="groupsFilterTab === 'ALL'" (click)="groupsFilterTab = 'ALL'">
+            <span>📋 Xem Tất Cả ({{ groups.length }})</span>
+          </button>
+          <button class="group-tab-btn" [class.active]="groupsFilterTab === 'APPROVED'" (click)="groupsFilterTab = 'APPROVED'">
+            <span>🟢 Đã Tham Gia ({{ approvedGroups.length }})</span>
+          </button>
+          <button class="group-tab-btn" [class.active]="groupsFilterTab === 'DISCOVERED'" (click)="groupsFilterTab = 'DISCOVERED'">
+            <span>🔍 Mới Dò Tìm ({{ discoveredGroups.length }})</span>
+          </button>
+          <button class="group-tab-btn" [class.active]="groupsFilterTab === 'PENDING'" (click)="groupsFilterTab = 'PENDING'">
+            <span>🟡 Chờ Duyệt ({{ pendingGroups.length }})</span>
+          </button>
+        </div>
+
+        <!-- Category Filters -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; align-items: center;">
+          <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Lọc theo ngành:</span>
+          <button class="subnav-pill" [class.active]="selectedGroupCategoryFilter === 'ALL'" (click)="selectedGroupCategoryFilter = 'ALL'" style="padding: 4px 12px; font-size: 0.8rem;">
+            Tất cả ngành
+          </button>
+          <button class="subnav-pill" [class.active]="selectedGroupCategoryFilter === 'Thời Trang Nam'" (click)="selectedGroupCategoryFilter = 'Thời Trang Nam'" style="padding: 4px 12px; font-size: 0.8rem;">
+            👔 Thời Trang Nam ({{ categoryInventory['Thời Trang Nam'] || 0 }})
+          </button>
+          <button class="subnav-pill" [class.active]="selectedGroupCategoryFilter === 'Thời Trang Nữ'" (click)="selectedGroupCategoryFilter = 'Thời Trang Nữ'" style="padding: 4px 12px; font-size: 0.8rem;">
+            👗 Thời Trang Nữ ({{ categoryInventory['Thời Trang Nữ'] || 0 }})
+          </button>
+          <button class="subnav-pill" [class.active]="selectedGroupCategoryFilter === 'Thiết Bị Điện Tử'" (click)="selectedGroupCategoryFilter = 'Thiết Bị Điện Tử'" style="padding: 4px 12px; font-size: 0.8rem;">
+            📱 Thiết Bị Điện Tử ({{ categoryInventory['Thiết Bị Điện Tử'] || 0 }})
+          </button>
+          <button class="subnav-pill" [class.active]="selectedGroupCategoryFilter === 'Săn Deal Tổng Hợp'" (click)="selectedGroupCategoryFilter = 'Săn Deal Tổng Hợp'" style="padding: 4px 12px; font-size: 0.8rem;">
+            ⚡ Săn Deal & Voucher ({{ categoryInventory['Săn Deal Tổng Hợp'] || 0 }})
+          </button>
+        </div>
+
+        <!-- BẢNG NHÓM FACEBOOK -->
+        <div class="glass-card" style="margin-bottom: 28px; padding: 20px;">
+          <div class="table-container" *ngIf="groups.length > 0; else noGroupsFound">
+            <table class="custom-table group-custom-table">
+              <colgroup>
+                <col style="width: 25%;">
+                <col style="width: 16%;">
+                <col style="width: 27%;">
+                <col style="width: 12%;">
+                <col style="width: 20%;">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Nhóm Facebook</th>
+                  <th>Ngành Hàng Khớp</th>
+                  <th>Sản Phẩm Khớp Chuẩn</th>
+                  <th>Lần Đăng Cuối</th>
+                  <th style="text-align: right;">Hành Động</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let g of (selectedGroupCategoryFilter === 'ALL' ? (groupsFilterTab === 'ALL' ? groups : (groupsFilterTab === 'APPROVED' ? approvedGroups : (groupsFilterTab === 'DISCOVERED' ? discoveredGroups : pendingGroups))) : filteredApprovedGroups)">
+                  <td>
+                    <div class="group-cell-info">
+                      <div class="group-name-row">
+                        <span class="group-badge-icon">👥</span>
+                        <span class="group-name-text" [title]="g.name">{{ g.name }}</span>
+                        <a [href]="g.url" target="_blank" class="group-ext-link" title="Mở nhóm trên Facebook">↗</a>
+                      </div>
+                      <div class="group-meta-sub">
+                        <span class="group-members-pill">👥 {{ g.members_count | number }} TV</span>
+                        <span class="group-id-pill">ID: {{ g.group_id }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <!-- Editable Category Dropdown -->
+                    <select [(ngModel)]="g.category_name" 
+                            (change)="updateGroupCategory(g.group_id, g.category_name)"
+                            class="group-cat-select"
+                            title="Đổi ngành hàng để tự động khớp sản phẩm phù hợp">
+                      <option *ngFor="let cat of availableCategories" [value]="cat">{{ cat }}</option>
+                    </select>
+                  </td>
+                  <td>
+                    <!-- Auto-Matched Product Preview -->
+                    <div *ngIf="g.matched_deal" class="matched-deal-card">
+                      <div class="deal-thumb-wrap">
+                        <img [src]="getDealImageUrl(g.matched_deal)" 
+                             (error)="onImageError($event, g.matched_deal)" 
+                             class="matched-deal-thumb"
+                             [alt]="g.matched_deal.name">
+                        <span *ngIf="g.matched_deal.discount_percent" class="thumb-disc-tag">
+                          -{{ g.matched_deal.discount_percent }}%
+                        </span>
+                      </div>
+                      <div class="matched-deal-details">
+                        <div class="matched-deal-name" [title]="g.matched_deal.name">
+                          {{ g.matched_deal.name }}
+                        </div>
+                        <div class="matched-deal-price-row">
+                          <span class="matched-price-sale">{{ g.matched_deal.price_sale | number }}đ</span>
+                          <span class="matched-platform-pill" [class.shopee]="g.matched_deal.platform !== 'LAZADA'" [class.lazada]="g.matched_deal.platform === 'LAZADA'">
+                            {{ g.matched_deal.platform === 'LAZADA' ? 'Lazada' : 'Shopee' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div *ngIf="!g.matched_deal" class="no-deal-warning">
+                      <span>⚠️</span> Chưa có deal ngành này
+                    </div>
+                  </td>
+                  <td>
+                    <div class="last-posted-cell">
+                      <span *ngIf="g.last_posted_at" class="posted-time-badge">
+                        ✓ {{ g.last_posted_at }}
+                      </span>
+                      <span *ngIf="!g.last_posted_at" class="never-posted-badge">
+                        Chưa đăng lần nào
+                      </span>
+                    </div>
+                  </td>
+                  <td style="text-align: right;">
+                    <div class="group-actions-panel">
+                      <!-- Row 1: Primary actions -->
+                      <div class="actions-row-top">
+                        <button *ngIf="g.status === 'APPROVED' && g.matched_deal" 
+                                class="btn-post-now"
+                                [disabled]="postingSingleGroup[g.group_id]"
+                                (click)="postToSingleGroup(g)"
+                                [title]="'Đăng sản phẩm ' + g.matched_deal.name + ' vào nhóm này'">
+                          <span *ngIf="!postingSingleGroup[g.group_id]">⚡ Đăng Deal</span>
+                          <span *ngIf="postingSingleGroup[g.group_id]">⏳ Đang đăng...</span>
+                        </button>
+                        <button *ngIf="g.status === 'APPROVED'" 
+                                class="btn-pick-other" 
+                                (click)="openPickDealModal(g)"
+                                title="Mở danh sách deal để tự chọn món muốn đăng">
+                          🎯 Đổi Deal
+                        </button>
+                      </div>
+                      <!-- Row 2: Secondary actions -->
+                      <div class="actions-row-bot">
+                        <a [href]="g.url" target="_blank" class="btn-mini-fb" title="Mở trực tiếp nhóm trên Facebook">
+                          Mở FB ↗
+                        </a>
+                        <button *ngIf="g.status !== 'APPROVED'" class="btn-action-green" (click)="updateGroupStatus(g.group_id, 'APPROVED')">
+                          ✓ Duyệt
+                        </button>
+                        <button class="btn-mini-del" (click)="deleteGroup(g.group_id)" title="Xóa nhóm khỏi CSDL">
+                          ✕ Xóa
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ng-template #noGroupsFound>
+            <div style="text-align: center; padding: 24px; color: #94a3b8;">Chưa có nhóm nào trong danh mục này. Bấm "Đồng Bộ Nhóm Đã Tham Gia" để quét tự động!</div>
+          </ng-template>
+        </div>
+
+        <!-- BẢNG LỊCH SỬ BÀI VIẾT & COMMENT ĐÃ ĐĂNG -->
+        <div class="glass-card" style="padding: 24px; margin-bottom: 28px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 1.2rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>📋</span> Lịch Sử Bài Viết & Comment Đã Đăng ({{ postedLogs.length }})
+              </h3>
+              <p style="margin: 0; font-size: 0.85rem; color: #94a3b8;">Lưu lại toàn bộ bài đăng và bình luận để bạn bấm trực tiếp vào kiểm tra trên Facebook bất cứ lúc nào.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-action" (click)="fetchPostedLogs()">🔄 Làm Mới</button>
+              <button class="btn-primary" (click)="showAddLogModal = true">+ Thêm Log Bài Vừa Đăng</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;" *ngIf="postedLogs.length > 0; else noPostedLogs">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Loại</th>
+                  <th>Nhóm Facebook</th>
+                  <th>Link Kiểm Tra Trên FB</th>
+                  <th>Sản Phẩm</th>
+                  <th>Ảnh Đính Kèm</th>
+                  <th>Nội Dung Tóm Tắt</th>
+                  <th>Thời Gian</th>
+                  <th>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let log of postedLogs">
+                  <td>
+                    <span class="badge" [style.background]="log.type === 'POST' ? '#3b82f6' : '#10b981'">
+                      {{ log.type === 'POST' ? '📝 Bài Viết' : '💬 Bình Luận' }}
+                    </span>
+                  </td>
+                  <td style="font-weight: 600; color: #f1f5f9;">{{ log.group_name }}</td>
+                  <td>
+                    <a *ngIf="log.target_url" [href]="log.target_url" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                      🔗 Mở trên Facebook ↗
+                    </a>
+                    <span *ngIf="!log.target_url" style="color: #64748b; font-style: italic;">Chưa có link</span>
+                  </td>
+                  <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ log.item_name || 'Deal tổng hợp' }}
+                  </td>
+                  <td>
+                    <img *ngIf="log.item_id" [src]="backendBaseUrl + '/api/deals/image/' + log.item_id" referrerpolicy="no-referrer" (error)="$any($event.target).style.display='none'" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover;" alt="Ảnh">
+                    <span *ngIf="!log.item_id" style="color: #64748b;">—</span>
+                  </td>
+                  <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1;">
+                    {{ log.content_snippet }}
+                  </td>
+                  <td style="font-size: 0.8rem; color: #94a3b8; white-space: nowrap;">{{ log.posted_at }}</td>
+                  <td>
+                    <button (click)="deletePostedLog(log.id)" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.9rem;" title="Xóa">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ng-template #noPostedLogs>
+            <div style="color: #94a3b8; font-style: italic; padding: 20px; text-align: center;">
+              Chưa có bài đăng nào được ghi nhận. Khi bạn bấm gieo seeding hoặc đăng bài, hệ thống sẽ tự động lưu lại link ở đây!
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- TỪ KHÓA DÒ TÌM NHÓM ĐÃ HỌC ĐƯỢC -->
+        <div class="glass-card" style="padding: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <span>🧠</span> Từ Khóa Ngành Hàng Đã Học Được ({{ learnedKeywords.length }})
+              </h3>
+              <small style="color: #94a3b8;">Hệ thống tự động học các cụm từ đắt giá từ tên nhóm để mở rộng tìm kiếm nhóm mới</small>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-table-link" style="padding: 6px 12px; font-size: 0.85rem;" (click)="seedLearnedKeywords()">🔄 Học Lại Từ Nhóm</button>
+              <button class="btn-clear-table" style="padding: 6px 12px; font-size: 0.85rem;" *ngIf="learnedKeywords.length > 0" (click)="clearLearnedKeywords()">🗑️ Xóa Bộ Nhớ</button>
+            </div>
+          </div>
+          
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;" *ngIf="learnedKeywords.length > 0; else noKeywords">
+            <span *ngFor="let kw of learnedKeywords" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; font-size: 0.85rem; color: #e2e8f0;">
+              <strong style="color: #60a5fa;">[{{ kw.category_name }}]</strong>
+              <span>{{ kw.keyword }}</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 12px; font-size: 0.75rem; color: #cbd5e1;">x{{ kw.frequency }}</span>
+            </span>
+          </div>
+          <ng-template #noKeywords>
+            <div style="color: #94a3b8; font-style: italic; font-size: 0.9rem; padding: 8px 0;">Chưa có từ khóa nào được học. Khi bot tìm thấy nhóm mới, các từ khóa sẽ tự động tích lũy tại đây!</div>
+          </ng-template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- HUB 4: CÀI ĐẶT & LỊCH CHẠY (SETTINGS & SCHEDULE) -->
+    <!-- ============================================== -->
     <section class="content-body" *ngIf="activeTab === 'settings'">
+      <!-- TRUNG TÂM ĐIỀU PHỐI TIẾN TRÌNH MASTER WORKFLOW (TỰ ĐỘNG & THỦ CÔNG) -->
+      <div class="master-workflow-card">
+        <div class="workflow-header">
+          <div class="workflow-title-box">
+            <div class="workflow-icon">⚡</div>
+            <div>
+              <h2 style="margin: 0 0 4px 0; font-size: 1.35rem; color: #f8fafc; font-weight: 800;">
+                Trung Tâm Điều Phối Master Workflow (Tự Động & Thủ Công)
+              </h2>
+              <p style="margin: 0; color: #94a3b8; font-size: 0.9rem;">
+                Hệ thống hóa toàn bộ luồng tác vụ thành chu trình 5 bước khép kín. Vừa hỗ trợ hẹn giờ tự động hàng ngày, vừa cho phép bấm chạy riêng lẻ từng bước kèm báo cáo thời gian thực.
+              </p>
+            </div>
+          </div>
+          <div>
+            <button class="btn-master-run" [disabled]="stats.is_running || runningWorkflowStep === 'all'" (click)="runWorkflowAll()">
+              <span *ngIf="runningWorkflowStep !== 'all' && !stats.is_running">🚀 KÍCH HOẠT TOÀN TRÌNH 5 BƯỚC</span>
+              <span *ngIf="runningWorkflowStep === 'all' || stats.is_running">⏳ ĐANG XỬ LÝ TOÀN TRÌNH...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Safety Notice: Tắt tự động quét khi bật server -->
+        <div class="safety-notice-box">
+          <div class="safety-notice-icon">🛡️</div>
+          <div>
+            <strong style="color: #34d399;">Quy tắc an toàn hệ thống:</strong>
+            Mặc định khi khởi động ứng dụng, việc tự động quét deal <strong style="color: #fff;">LUÔN ĐƯỢC TẮT</strong>.
+            Hệ thống tuyệt đối không tự ý quét dữ liệu làm chậm máy hoặc hao băng thông. Quá trình chỉ chạy tự động khi bạn chủ động gạt <strong>BẬT</strong> bên dưới và đến đúng khung giờ đã hẹn, hoặc khi bạn nhấn chạy thủ công từng bước.
+          </div>
+        </div>
+
+        <!-- PHẦN 1: BỘ HẸN GIỜ QUÉT DEAL HÀNG NGÀY (CRONJOB SCHEDULER) -->
+        <div class="workflow-section-box">
+          <h3 class="section-head-title">
+            <span>⏰</span> 1. Cấu Hình Lịch Chạy Hàng Ngày Tự Động (Cronjob Scheduler)
+          </h3>
+          <div class="schedule-row">
+            <div class="form-group toggle-group" style="margin-bottom: 0;">
+              <label class="switch-label">
+                <input type="checkbox" [(ngModel)]="schedule.enabled">
+                <span class="slider"></span>
+                <strong style="font-size: 0.95rem;">Bật Tự Động Chạy Hàng Ngày</strong>
+              </label>
+              <small style="color: #94a3b8; display: block; margin-top: 4px;">
+                {{ schedule.enabled ? '🟢 Đang BẬT: Bot sẽ tự quét deal đúng giờ' : '⚪ Đang TẮT: An toàn, chỉ chạy thủ công khi bạn bấm' }}
+              </small>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Giờ chạy hàng ngày (HH:MM):</label>
+              <input type="time" [(ngModel)]="schedule.time" class="time-input" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; display: block;">Số ngành hàng quét mỗi lần:</label>
+              <input type="number" min="1" max="10" [(ngModel)]="schedule.cats" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+
+            <div>
+              <button class="btn-save" style="padding: 10px 18px; font-size: 0.85rem; height: 42px; display: flex; align-items: center; gap: 6px;" (click)="saveSchedule()">
+                💾 Lưu Lịch Hàng Ngày
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHẦN 2: THỰC THI THỦ CÔNG TỪNG BƯỚC ĐỘC LẬP (PIPELINE) -->
+        <div class="workflow-section-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+            <h3 class="section-head-title" style="margin: 0;">
+              <span>🕹️</span> 2. Thực Thi Thủ Công Từng Bước Độc Lập
+            </h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 0.85rem; color: #94a3b8;">Số ngành hàng quét deal thủ công:</span>
+              <select [(ngModel)]="workflowCats" style="padding: 5px 12px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.85rem;">
+                <option [ngValue]="1">1 Ngành Hàng (Nhanh)</option>
+                <option [ngValue]="2">2 Ngành Hàng</option>
+                <option [ngValue]="3">3 Ngành Hàng (Khuyên dùng)</option>
+                <option [ngValue]="5">5 Ngành Hàng (Toàn diện)</option>
+              </select>
+            </div>
+          </div>
+          <p style="margin: 0 0 14px 0; color: #94a3b8; font-size: 0.85rem;">
+            Bạn có thể bấm chạy riêng lẻ bất kỳ khâu nào để kiểm tra ngay sản phẩm, ảnh tạo ra hoặc bài đăng mà không bắt buộc phải chạy toàn trình:
+          </p>
+
+          <div class="pipeline-step-grid">
+            <!-- Bước 1 -->
+            <div class="step-card" [class.active-running]="runningWorkflowStep === 'crawl'">
+              <div>
+                <span class="step-badge">Bước 1</span>
+                <h4 class="step-title"><span>🔍</span> Quét Deal Sốc</h4>
+                <p class="step-desc">Cào & lọc top deal từ Shopee API + Lazada Mall theo ngành hàng đã chọn.</p>
+              </div>
+              <button class="btn-step-action" [disabled]="stats.is_running || runningWorkflowStep !== null" (click)="runWorkflowStep('crawl')">
+                <span *ngIf="runningWorkflowStep !== 'crawl'">⚡ Quét Deal Ngay</span>
+                <span *ngIf="runningWorkflowStep === 'crawl'">⏳ Đang quét...</span>
+              </button>
+            </div>
+
+            <!-- Bước 2 -->
+            <div class="step-card" [class.active-running]="runningWorkflowStep === 'media'">
+              <div>
+                <span class="step-badge">Bước 2</span>
+                <h4 class="step-title"><span>🎨</span> Tạo Ảnh & Bìa</h4>
+                <p class="step-desc">Đóng khung Flash Sale đỏ 800x800, ảnh bìa 1080x1080 và ghép 4 góc Collage.</p>
+              </div>
+              <button class="btn-step-action" [disabled]="runningWorkflowStep !== null" (click)="runWorkflowStep('media')">
+                <span *ngIf="runningWorkflowStep !== 'media'">🖼️ Tạo Ảnh Sale</span>
+                <span *ngIf="runningWorkflowStep === 'media'">⏳ Đang tạo...</span>
+              </button>
+            </div>
+
+            <!-- Bước 3 -->
+            <div class="step-card" [class.active-running]="runningWorkflowStep === 'telegram'">
+              <div>
+                <span class="step-badge">Bước 3</span>
+                <h4 class="step-title"><span>📢</span> Kênh Telegram</h4>
+                <p class="step-desc">Soạn bài tự động kèm ảnh đã đóng khung và bắn lên Channel / Group Telegram.</p>
+              </div>
+              <button class="btn-step-action" [disabled]="runningWorkflowStep !== null" (click)="runWorkflowStep('telegram')">
+                <span *ngIf="runningWorkflowStep !== 'telegram'">✈️ Bắn Telegram</span>
+                <span *ngIf="runningWorkflowStep === 'telegram'">⏳ Đang bắn...</span>
+              </button>
+            </div>
+
+            <!-- Bước 4 -->
+            <div class="step-card" [class.active-running]="runningWorkflowStep === 'fb'">
+              <div>
+                <span class="step-badge">Bước 4</span>
+                <h4 class="step-title"><span>👥</span> Đăng Nhóm FB</h4>
+                <p class="step-desc">Khởi động đăng bài dần vào các nhóm Facebook đã duyệt theo đúng ngành hàng.</p>
+              </div>
+              <button class="btn-step-action" [disabled]="runningWorkflowStep !== null" (click)="runWorkflowStep('fb')">
+                <span *ngIf="runningWorkflowStep !== 'fb'">📘 Đăng Nhóm FB</span>
+                <span *ngIf="runningWorkflowStep === 'fb'">⏳ Đang đăng...</span>
+              </button>
+            </div>
+
+            <!-- Bước 5 -->
+            <div class="step-card" [class.active-running]="runningWorkflowStep === 'seeding'">
+              <div>
+                <span class="step-badge">Bước 5</span>
+                <h4 class="step-title"><span>💬</span> Gieo Seeding</h4>
+                <p class="step-desc">Quét bài viết nhóm thảo luận và gieo bình luận kèm link mồi 1k & link Anti-Ban.</p>
+              </div>
+              <button class="btn-step-action" [disabled]="runningWorkflowStep !== null" (click)="runWorkflowStep('seeding')">
+                <span *ngIf="runningWorkflowStep !== 'seeding'">🎯 Gieo Seeding</span>
+                <span *ngIf="runningWorkflowStep === 'seeding'">⏳ Đang gieo...</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHẦN 3: BẢNG BÁO CÁO TIẾN TRÌNH THỰC THI (WORKFLOW REPORTS TABLE) -->
+        <div class="workflow-section-box" style="margin-bottom: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="section-head-title" style="margin: 0 0 4px 0;">
+                <span>📊</span> 3. Báo Cáo Tiến Trình & Lịch Sử Thực Thi ({{ workflowReports.length }} phiên gần nhất)
+              </h3>
+              <small style="color: #94a3b8;">Ghi nhận chi tiết từng phiên chạy tự động lẫn thủ công: thời lượng, số deal cào được, số ảnh tạo, số bài đăng và nhật ký lỗi.</small>
+            </div>
+            <div>
+              <button class="btn-refresh" style="padding: 6px 14px; font-size: 0.85rem;" (click)="fetchWorkflowReports()">
+                🔄 Làm Mới Báo Cáo
+              </button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;" *ngIf="workflowReports.length > 0; else noWorkflowReports">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 140px;">Thời Gian</th>
+                  <th style="width: 150px;">Loại Khởi Chạy</th>
+                  <th style="width: 130px;">Phân Đoạn</th>
+                  <th style="width: 110px;">Trạng Thái</th>
+                  <th style="width: 90px;">Thời Lượng</th>
+                  <th style="width: 180px;">Sản Lượng (KPI)</th>
+                  <th>Tóm Tắt & Kết Quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let rep of workflowReports">
+                  <td style="font-size: 0.82rem; color: #cbd5e1; white-space: nowrap;">
+                    {{ rep.created_at }}
+                  </td>
+                  <td>
+                    <span class="badge-run-type" [ngClass]="{
+                      'badge-run-auto': rep.run_type === 'AUTO_SCHEDULE',
+                      'badge-run-all': rep.run_type === 'MANUAL_ALL',
+                      'badge-run-step': rep.run_type === 'MANUAL_STEP'
+                    }">
+                      {{ rep.run_type === 'AUTO_SCHEDULE' ? '⏰ Lịch Tự Động' : (rep.run_type === 'MANUAL_ALL' ? '🚀 Toàn Trình 5 Bước' : '🕹️ Thủ Công Bước') }}
+                    </span>
+                  </td>
+                  <td style="font-weight: 600; font-size: 0.82rem; color: #e2e8f0;">
+                    {{ rep.step_name }}
+                  </td>
+                  <td>
+                    <span class="badge-run-type" [ngClass]="{
+                      'badge-status-success': rep.status === 'SUCCESS',
+                      'badge-status-running': rep.status === 'RUNNING',
+                      'badge-status-error': rep.status === 'ERROR'
+                    }">
+                      {{ rep.status === 'SUCCESS' ? '✓ Thành công' : (rep.status === 'RUNNING' ? '⏳ Đang chạy' : '✕ Gặp lỗi') }}
+                    </span>
+                  </td>
+                  <td style="font-family: monospace; font-size: 0.85rem; color: #38bdf8;">
+                    {{ rep.duration_seconds ? (rep.duration_seconds + 's') : '—' }}
+                  </td>
+                  <td style="font-size: 0.8rem; color: #a7f3d0; line-height: 1.4;">
+                    <div *ngIf="rep.deals_saved > 0">🛍️ +{{ rep.deals_saved }} Deal đã lưu</div>
+                    <div *ngIf="rep.banners_created > 0">🎨 +{{ rep.banners_created }} Ảnh banner</div>
+                    <div *ngIf="rep.telegram_posts > 0">📢 +{{ rep.telegram_posts }} Telegram</div>
+                    <div *ngIf="rep.fb_posts > 0">📘 +{{ rep.fb_posts }} FB Groups</div>
+                    <div *ngIf="rep.comments_seeded > 0">💬 +{{ rep.comments_seeded }} Seeding</div>
+                    <span *ngIf="!rep.deals_saved && !rep.banners_created && !rep.telegram_posts && !rep.fb_posts && !rep.comments_seeded" style="color: #64748b;">—</span>
+                  </td>
+                  <td style="font-size: 0.82rem; color: #cbd5e1; max-width: 320px;">
+                    <span [style.color]="rep.status === 'ERROR' ? '#f87171' : '#cbd5e1'">
+                      {{ rep.summary_text || rep.error_message || 'Chưa có ghi chú' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ng-template #noWorkflowReports>
+            <div style="color: #94a3b8; font-style: italic; padding: 24px; text-align: center; background: rgba(0,0,0,0.15); border-radius: 10px;">
+              Chưa có phiên chạy nào trong lịch sử báo cáo. Bạn có thể nhấn thử một bước ở trên hoặc kích hoạt toàn trình để ghi nhận phiên đầu tiên!
+            </div>
+          </ng-template>
+        </div>
+      </div>
+
       <div class="settings-grid">
         <!-- 1. Cấu hình Tài khoản Facebook -->
         <div class="settings-card glass-card">
@@ -342,13 +2067,19 @@
           <p class="card-desc">Cần có ít nhất 1 trong 2: Cookie Shopee hoặc Shopee Open API để tránh bị sàn chặn 403.</p>
 
           <div class="form-group">
-            <label>Shopee Cookie (Dễ nhất - Copy từ trình duyệt Chrome):</label>
+            <label>Cookie Cổng Affiliate (affiliate.shopee.vn) - BẮT BUỘC ĐỂ NHẬN HOA HỒNG:</label>
+            <textarea rows="2" [(ngModel)]="config.shopee_aff_cookie" placeholder="SPC_F=...; SPC_SI=...; SPC_ST=...; SPC_U=..."></textarea>
+            <small>F12 trên affiliate.shopee.vn $\rightarrow$ Network $\rightarrow$ Copy Header 'Cookie' dán vào đây</small>
+          </div>
+
+          <div class="form-group">
+            <label>Shopee Web Cookie (shopee.vn - Dùng để cào sản phẩm vượt tường lửa):</label>
             <textarea rows="2" [(ngModel)]="config.shopee_cookie" placeholder="SPC_F=...; SPC_SI=...; SPC_U=..."></textarea>
             <small>F12 trên shopee.vn $\rightarrow$ Network $\rightarrow$ Copy Header 'Cookie' dán vào đây</small>
           </div>
 
           <div class="form-group">
-            <label>Shopee App ID (Nếu dùng Open API chính thức):</label>
+            <label>Shopee App ID (Nếu có Open API chính thức):</label>
             <input type="text" [(ngModel)]="config.shopee_app_id" placeholder="VD: 18000000001">
           </div>
 
@@ -357,9 +2088,50 @@
             <input type="password" [(ngModel)]="config.shopee_secret" placeholder="Mã bí mật từ affiliate.shopee.vn">
           </div>
 
-          <div class="test-btn-box">
+          <div class="test-btn-box" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn-test" [disabled]="testingShopeeAff" (click)="testShopeeAffConnection()">
+              {{ testingShopeeAff ? '⏳ Đang kiểm tra cổng Aff...' : '🧪 Kiểm Tra Cổng Affiliate (affiliate.shopee.vn)' }}
+            </button>
             <button class="btn-test" [disabled]="testingShopee" (click)="testShopeeConnection()">
-              {{ testingShopee ? '⏳ Đang kiểm tra kết nối...' : '🧪 Kiểm Tra Kết Nối Shopee' }}
+              {{ testingShopee ? '⏳ Đang kiểm tra kết nối...' : '🧪 Kiểm Tra Cào Shopee.vn' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 2b. Cấu hình Lazada Affiliate & API -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🛍️</span>
+            <h3>2b. Lazada Affiliate & Open Platform API</h3>
+          </div>
+          <p class="card-desc">Cấu hình App Key/Secret từ open.lazada.com hoặc Cookie/Tracking URL từ Lazada Affiliate Portal.</p>
+
+          <div class="form-group">
+            <label>Lazada App Key (Open Platform API):</label>
+            <input type="text" [(ngModel)]="config.lazada_app_key" placeholder="VD: 123456">
+            <small>Lấy tại open.lazada.com nếu bạn dùng Open Platform API chính thức</small>
+          </div>
+
+          <div class="form-group">
+            <label>Lazada App Secret:</label>
+            <input type="password" [(ngModel)]="config.lazada_app_secret" placeholder="Mã bí mật từ open.lazada.com">
+          </div>
+
+          <div class="form-group">
+            <label>Lazada Affiliate Cookie (Dùng cho Web Portal):</label>
+            <textarea rows="2" [(ngModel)]="config.lazada_aff_cookie" placeholder="lzd_sid=...; _m_h5_tk=..."></textarea>
+            <small>F12 trên affiliate.lazada.vn $\rightarrow$ Network $\rightarrow$ Copy Header 'Cookie'</small>
+          </div>
+
+          <div class="form-group">
+            <label>Lazada Tracking URL / DeepLink Template:</label>
+            <input type="text" [(ngModel)]="config.lazada_tracking_url" placeholder="https://c.lazada.vn/t/c.xxxx?url={url}&sub_aff_id={sub_id}">
+            <small>Đường link tracking mẫu do Lazada cấp trong phần Ads Link Generator</small>
+          </div>
+
+          <div class="test-btn-box">
+            <button class="btn-test" [disabled]="testingLazada" (click)="testLazadaConnection()">
+              {{ testingLazada ? '⏳ Đang kiểm tra Lazada...' : '🧪 Kiểm Tra Kết Nối Lazada' }}
             </button>
           </div>
         </div>
@@ -423,6 +2195,67 @@
             </div>
           </div>
         </div>
+
+        <!-- 5. Kênh Cộng Đồng Riêng (PR Kéo Member Zalo / Tele / FB) -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🚀</span>
+            <h3>5. Kênh Cộng Đồng Riêng (PR Kéo Member)</h3>
+          </div>
+          <p class="card-desc">Tự động chèn link mời vào nhóm Zalo/Telegram/FB của bạn vào cuối các bài viết tổng hợp deal và lịch sale.</p>
+
+          <div class="form-group">
+            <label>Link Tham Gia Nhóm (Zalo Group / Telegram / Group Facebook):</label>
+            <input type="text" [(ngModel)]="config.community_invite_url" placeholder="https://zalo.me/g/... hoặc https://t.me/...">
+            <small>Hệ thống sẽ dùng link này để kéo người dùng từ các group khác về cộng đồng của bạn</small>
+          </div>
+
+          <div class="form-group">
+            <label>Tên Cộng Đồng Của Bạn:</label>
+            <input type="text" [(ngModel)]="config.community_name" placeholder="Hội Săn Deal Shopee VIP">
+          </div>
+        </div>
+
+        <!-- 6. Chế Độ Link Chuyển Hướng (Anti-Die Link) -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🔗</span>
+            <h3>6. Chế Độ Link Chuyển Hướng (Anti-Die Link)</h3>
+          </div>
+          <p class="card-desc">Cấu hình cách hoạt động của link khi chia sẻ lên Facebook để đảm bảo 100% không bị chết khi tắt máy tính.</p>
+
+          <div class="form-group">
+            <label>Phương thức Link:</label>
+            <select [(ngModel)]="config.redirect_mode" style="width: 100%; padding: 10px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 8px;">
+              <option value="direct">Trực tiếp Shopee Affiliate (Khuyên dùng - 100% sống vĩnh viễn, không phụ thuộc localhost)</option>
+              <option value="tinyurl">Rút gọn qua TinyURL Cloud API (Miễn phí vĩnh viễn trên đám mây, link ngắn đẹp)</option>
+              <option value="custom_domain">Tên miền riêng trung gian Anti-Ban (Cần cấu hình Domain/Server riêng)</option>
+            </select>
+            <small style="display: block; margin-top: 6px; color: #94a3b8;">
+              * Ở chế độ "Trực tiếp", link sẽ dẫn thẳng tới sàn qua tracking Sub-ID, máy bạn tắt người dùng vẫn bấm mua bình thường!
+            </small>
+          </div>
+
+          <div class="form-group" *ngIf="config.redirect_mode === 'custom_domain'">
+            <label>Domain Riêng Của Bạn (Ví dụ: https://deals.domaincuaban.com):</label>
+            <input type="text" [(ngModel)]="config.redirect_base_url" placeholder="https://deals.domaincuaban.com">
+          </div>
+        </div>
+
+        <!-- 7. Bảo Mật API & Quản Trị Hệ Thống -->
+        <div class="settings-card glass-card">
+          <div class="card-title">
+            <span class="icon">🔒</span>
+            <h3>7. Bảo Mật API & Quản Trị Hệ Thống</h3>
+          </div>
+          <p class="card-desc">Thiết lập Secret Admin Key để bảo vệ các API nhạy cảm khi deploy ra môi trường Internet công khai.</p>
+
+          <div class="form-group">
+            <label>API Admin Key (X-Admin-Key):</label>
+            <input type="password" [(ngModel)]="config.api_admin_key" placeholder="Nhập khóa bảo vệ (Để trống = chạy local không cần key)">
+            <small>Khi thiết lập, các tác vụ kích hoạt chạy (/api/run), sửa cấu hình (/api/config) sẽ yêu cầu header X-Admin-Key</small>
+          </div>
+        </div>
       </div>
 
       <!-- Save Button -->
@@ -431,7 +2264,9 @@
       </div>
     </section>
 
-    <!-- TAB: LIVE LOGS -->
+    <!-- ============================================== -->
+    <!-- HUB 5: NHẬT KÝ THỰC THI (LIVE STREAM)          -->
+    <!-- ============================================== -->
     <section class="content-body" *ngIf="activeTab === 'logs'">
       <div class="log-viewer glass-card">
         <div class="log-toolbar">
@@ -455,9 +2290,197 @@
     </section>
   </main>
 
-  <!-- Toast Notification -->
-  <div class="toast" *ngIf="showToast" [ngClass]="toastType">
-    <span class="toast-icon">ℹ️</span>
-    <span class="toast-text">{{ toastMessage }}</span>
+  <!-- Modal Xem Chi Tiết Ảnh Banner 800x800 -->
+  <div class="modal-backdrop" *ngIf="showImageModal" (click)="closeImageModal()">
+    <div class="modal-card glass-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+          <span>🎨</span> Banner Đóng Khung Flash Sale (800x800)
+        </h3>
+        <button class="btn-close" (click)="closeImageModal()">✕</button>
+      </div>
+      <div class="modal-body" *ngIf="selectedPreviewDeal">
+        <div class="preview-img-box">
+          <img [src]="getDealImageUrl(selectedPreviewDeal)" 
+               [alt]="selectedPreviewDeal.name" 
+               class="modal-banner-img"
+               referrerpolicy="no-referrer"
+               (error)="onImageError($event, selectedPreviewDeal)">
+        </div>
+        <div class="modal-info">
+          <h4 style="margin: 0 0 10px 0; font-size: 1.05rem; color: #f1f5f9;">{{ selectedPreviewDeal.name }}</h4>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px;">
+            <span style="font-size: 1.6rem; font-weight: 800; color: #ee4d2d;">{{ selectedPreviewDeal.price_sale | number }}đ</span>
+            <span style="font-size: 0.95rem; color: #94a3b8; text-decoration: line-through;">{{ selectedPreviewDeal.price_original | number }}đ</span>
+            <span style="background: #facc15; color: #991b1b; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.85rem;">-{{ selectedPreviewDeal.discount_percent }}%</span>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn-save" style="flex: 1; padding: 12px;" (click)="copyBridgeLink(selectedPreviewDeal.item_id)">
+              🛡️ Sao Chép Link Anti-Ban
+            </button>
+            <a [href]="selectedPreviewDeal.aff_url || selectedPreviewDeal.item_url" target="_blank" class="btn-primary" style="flex: 1; padding: 12px; text-align: center; text-decoration: none;">
+              Mở Trực Tiếp ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Thêm Log Bài Viết / Comment Đã Đăng -->
+  <div class="modal-backdrop" *ngIf="showAddLogModal" (click)="showAddLogModal = false">
+    <div class="modal-card glass-card" (click)="$event.stopPropagation()" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+          <span>📝</span> Thêm Lịch Sử Bài Đăng / Comment Facebook
+        </h3>
+        <button class="btn-close" (click)="showAddLogModal = false">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px; display: block;">Loại hành động (*):</label>
+          <select [(ngModel)]="newPostLog.type" style="width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff;">
+            <option value="POST">📝 Bài Viết Nhóm (Post)</option>
+            <option value="COMMENT">💬 Bình Luận Seeding (Comment)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px; display: block;">Tên Nhóm Facebook (*):</label>
+          <input type="text" [(ngModel)]="newPostLog.group_name" placeholder="Ví dụ: Hội Săn Deal Shopee VIP" style="width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px; display: block;">Link Bài Viết Facebook (*):</label>
+          <input type="text" [(ngModel)]="newPostLog.target_url" placeholder="https://www.facebook.com/groups/.../posts/..." style="width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px; display: block;">Tên Sản Phẩm (Nếu có):</label>
+          <input type="text" [(ngModel)]="newPostLog.item_name" placeholder="Nồi chiên không dầu 6L..." style="width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px; display: block;">Nội Dung Tóm Tắt:</label>
+          <textarea rows="3" [(ngModel)]="newPostLog.content_snippet" placeholder="Nội dung đã đăng lên bài viết..." style="width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn-clear-table" (click)="showAddLogModal = false">Hủy</button>
+          <button class="btn-primary" (click)="addPostedLog()">💾 Lưu Log</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Chọn Deal Chuẩn Ngành Để Đăng Nhóm -->
+  <div class="modal-backdrop" *ngIf="showPickDealModal" (click)="closePickDealModal()">
+    <div class="modal-card modal-deal-picker glass-card" (click)="$event.stopPropagation()">
+      <div class="modal-header" style="flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+            🎯
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.18rem; color: #f8fafc; font-weight: 700; letter-spacing: -0.3px;">
+              Chọn Deal Chuẩn Ngành Đăng Nhóm
+            </h3>
+            <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span>Nhóm: <strong style="color: #38bdf8;">{{ selectedGroupForPicking?.name }}</strong></span>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                📁 Ngành: {{ selectedGroupForPicking?.category_name }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-close" (click)="closePickDealModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 20px;">
+        <!-- Tip note -->
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.85rem; color: #bae6fd; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.2rem;">💡</span>
+          <span style="line-height: 1.45;">Hệ thống chỉ hiển thị đúng sản phẩm thuộc ngành <strong>"{{ selectedGroupForPicking?.category_name }}"</strong> để đảm bảo bài đăng đúng tệp khách, duyệt nhanh và không bị kick khỏi group!</span>
+        </div>
+
+        <!-- Loading state -->
+        <div *ngIf="loadingCategoryDeals" style="text-align: center; padding: 48px 20px; color: #94a3b8;">
+          <div style="font-size: 2.2rem; margin-bottom: 14px; animation: pulse 1.5s infinite;">⏳</div>
+          <p style="font-size: 0.95rem; color: #cbd5e1;">Đang tải danh sách deal thuộc ngành {{ selectedGroupForPicking?.category_name }}...</p>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="!loadingCategoryDeals && dealsForCategory.length === 0" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+          <div style="font-size: 2.5rem; margin-bottom: 12px;">📦</div>
+          <h4 style="color: #f1f5f9; font-size: 1.05rem; margin-bottom: 8px;">Chưa có sản phẩm nào thuộc ngành này trong kho deal</h4>
+          <p style="font-size: 0.88rem; max-width: 440px; margin: 0 auto 16px; line-height: 1.5;">
+            Bạn có thể đổi ngành hàng phù hợp cho nhóm trên bảng hoặc qua tab "Săn Deal & Khuyến Mại" để quét thêm sản phẩm mới.
+          </p>
+          <button class="btn-small" style="background: #38bdf8; color: #0f172a; font-weight: 700; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;" (click)="closePickDealModal(); switchTab('deals')">
+            🛍️ Đi Tới Săn Deal
+          </button>
+        </div>
+
+        <!-- Deals list grid -->
+        <div *ngIf="!loadingCategoryDeals && dealsForCategory.length > 0" class="deal-pick-grid">
+          <div *ngFor="let deal of dealsForCategory" class="deal-pick-card">
+            <!-- Thumbnail -->
+            <div class="deal-pick-thumb-box">
+              <img [src]="getDealImageUrl(deal)" 
+                   [alt]="deal.name" 
+                   referrerpolicy="no-referrer"
+                   (error)="onImageError($event, deal)"
+                   class="deal-pick-img">
+              <span *ngIf="deal.discount_percent" class="deal-pick-disc-badge">
+                -{{ deal.discount_percent }}%
+              </span>
+            </div>
+
+            <!-- Content -->
+            <div class="deal-pick-info">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span class="badge" [class.badge-shopee]="deal.platform === 'shopee'" [class.badge-lazada]="deal.platform === 'lazada'" style="font-size: 0.65rem; padding: 1px 6px;">
+                  {{ deal.platform === 'lazada' ? 'Lazada' : 'Shopee' }}
+                </span>
+                <span *ngIf="deal.commission_rate" style="font-size: 0.72rem; color: #10b981; font-weight: 600;">
+                  Hoa hồng: {{ deal.commission_rate }}%
+                </span>
+              </div>
+              <h5 class="deal-pick-title" [title]="deal.name">
+                {{ deal.name }}
+              </h5>
+              <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;">
+                <span style="color: #f59e0b; font-weight: 800; font-size: 0.95rem;">
+                  {{ deal.price_sale | number }}đ
+                </span>
+                <span *ngIf="deal.price_original && deal.price_original > deal.price_sale" style="color: #64748b; font-size: 0.75rem; text-decoration: line-through;">
+                  {{ deal.price_original | number }}đ
+                </span>
+              </div>
+              <button class="btn-pick-deal-action" (click)="postSpecificDealToGroup(deal)">
+                <span>⚡</span> Đăng Deal Này Vào Nhóm
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 14px 20px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: rgba(15, 23, 42, 0.5);">
+        <span style="font-size: 0.82rem; color: #64748b;">
+          Tổng số deal phù hợp: <strong style="color: #f1f5f9;">{{ dealsForCategory.length }}</strong>
+        </span>
+        <button class="btn-clear-table" (click)="closePickDealModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Popup -->
+  <div class="toast-popup" [class.show]="showToast" [ngClass]="'toast-' + toastType">
+    <div class="toast-icon">
+      <span *ngIf="toastType === 'success'">✅</span>
+      <span *ngIf="toastType === 'error'">❌</span>
+      <span *ngIf="toastType === 'info'">ℹ️</span>
+    </div>
+    <div class="toast-text">{{ toastMessage }}</div>
   </div>
 </div>
