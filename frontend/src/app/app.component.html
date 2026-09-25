@@ -1319,15 +1319,50 @@
 
       <!-- SUBTAB 3B: GIEO BÌNH LUẬN SEEDING TỰ ĐỘNG -->
       <div *ngIf="marketingSubTab === 'seeding'">
-        <!-- Action Card: Seeding Trực Tiếp -->
-        <div class="action-banner glass-card" style="margin-bottom: 24px;">
-          <div class="banner-content">
-            <h3>Tự Động Quét Bài Viết & Gieo Bình Luận Đề Xuất Deal</h3>
-            <p>Hệ thống tự động phát hiện bài đăng xin link, hỏi mua trong các nhóm Facebook đã tham gia và soạn câu trả lời thân thiện kèm link trung gian Anti-Ban.</p>
+        <!-- Action Card: Seeding Trực Tiếp Tùy Chỉnh Không Giới Hạn -->
+        <div class="action-banner glass-card" style="margin-bottom: 24px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+            <div class="banner-content" style="max-width: 750px;">
+              <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.4); padding: 3px 10px; border-radius: 20px; font-size: 0.76rem; color: #34d399; font-weight: 700; margin-bottom: 8px;">
+                <span>🌱</span> SEEDING TỰ ĐỘNG THÔNG MINH (TÙY CHỈNH THOẢI MÁI)
+              </div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.25rem; color: #f8fafc;">Tự Động Quét Bài Viết & Gieo Bình Luận Đề Xuất Deal</h3>
+              <p style="margin: 0; color: #94a3b8; font-size: 0.88rem; line-height: 1.5;">
+                Bot tự động tìm các bài viết hỏi mua, xin link trong các nhóm Facebook đã tham gia và soạn câu trả lời thân thiện kèm link sản phẩm trực tiếp. Bạn có thể tự do chọn số nhóm quét (3, 5, 10, 20 hoặc toàn bộ không giới hạn) hoặc chỉ định đích danh nhóm muốn quét.
+              </p>
+            </div>
+            
+            <button class="btn-primary" [disabled]="seedingLoading" (click)="triggerCommentSeeding()" style="padding: 12px 24px; font-size: 0.95rem; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);">
+              {{ seedingLoading ? '⏳ Đang quét & gieo...' : '🌱 Kích Hoạt Gieo Seeding Ngay' }}
+            </button>
           </div>
-          <button class="btn-primary" [disabled]="seedingLoading" (click)="triggerCommentSeeding()">
-            {{ seedingLoading ? '⏳ Đang quét & gieo...' : '🌱 Kích Hoạt Gieo Seeding Ngay' }}
-          </button>
+
+          <!-- Controls tùy chỉnh số nhóm & nhóm cụ thể -->
+          <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: rgba(15, 23, 42, 0.6); padding: 14px 16px; border-radius: 12px; border: 1px solid #334155;">
+            <!-- Chọn Số Lượng Nhóm -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.85rem; color: #cbd5e1; font-weight: 600;">Số nhóm quét:</span>
+              <select [(ngModel)]="seedingMaxGroups" style="padding: 7px 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; font-size: 0.85rem;">
+                <option [ngValue]="3">3 nhóm (Thăm dò an toàn)</option>
+                <option [ngValue]="5">5 nhóm (Tiêu chuẩn)</option>
+                <option [ngValue]="10">10 nhóm (Khuyên dùng)</option>
+                <option [ngValue]="20">20 nhóm (Mở rộng)</option>
+                <option [ngValue]="50">50 nhóm (Quy mô lớn)</option>
+                <option [ngValue]="999">🚀 Tất cả nhóm (Không giới hạn)</option>
+              </select>
+            </div>
+
+            <!-- Chọn Nhóm Mục Tiêu Cụ Thể Hoặc Tất Cả -->
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px;">
+              <span style="font-size: 0.85rem; color: #cbd5e1; font-weight: 600;">Phạm vi nhóm:</span>
+              <select [(ngModel)]="seedingTargetGroupId" style="width: 100%; padding: 7px 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; font-size: 0.85rem;">
+                <option value="ALL">🌐 Tất cả nhóm tiềm năng trong kho ({{ groups.length }} nhóm)</option>
+                <option *ngFor="let g of groups" [value]="g.group_id">
+                  🎯 Nhóm riêng: {{ g.name }} ({{ g.members_count | number }} mem)
+                </option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <!-- LIVE SEEDING TERMINAL CONSOLE -->

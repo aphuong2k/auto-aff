@@ -134,17 +134,22 @@ class FacebookGroupSeeder:
         return None
 
     def generate_seeding_comment(self, deal: Dict, group_id: str, post_context: str = "") -> str:
-        """Tạo nội dung comment dạng review thực tế với link an toàn (direct/tinyurl) kèm Sub-ID tracking"""
+        """Tạo nội dung comment dạng review thực tế với link trực tiếp hoặc link an toàn kèm Sub-ID tracking"""
         item_id = str(deal.get("item_id", ""))
         direct_aff = deal.get("aff_url") or deal.get("item_url", "")
-        bridge_url = self.link_converter.get_bridge_url(
-            item_id=item_id,
-            channel="fb_seeding",
-            sub_id=f"grp_{group_id}",
-            direct_aff_url=direct_aff
-        )
+        redirect_mode = os.getenv("REDIRECT_MODE", "direct").lower().strip()
+
+        if redirect_mode == "direct":
+            chosen_url = direct_aff
+        else:
+            chosen_url = self.link_converter.get_bridge_url(
+                item_id=item_id,
+                channel="fb_seeding",
+                sub_id=f"grp_{group_id}",
+                direct_aff_url=direct_aff
+            )
         deal_copy = dict(deal)
-        deal_copy["aff_url"] = bridge_url
+        deal_copy["aff_url"] = chosen_url
         return DealContentWriter.generate_comment_seeding_post(deal_copy, query_context=post_context)
 
     def scan_group_for_real_posts(self, page, group_url: str, group_name: str = "") -> List[Dict]:
@@ -240,7 +245,7 @@ class FacebookGroupSeeder:
 
         return real_posts
 
-    def run_seeding_scan(self, max_groups: int = 3) -> List[Dict]:
+    def run_seeding_scan(self, max_groups: int = 10, target_group_id: Optional[str] = None) -> List[Dict]:
         """
         Quét các group Facebook thật đã tham gia (status='APPROVED' hoặc 'PENDING').
         - Nếu chưa có FB_COOKIE: Báo lỗi cấu hình rõ ràng, KHÔNG fake dữ liệu.
@@ -283,12 +288,19 @@ class FacebookGroupSeeder:
 
         # 2. LẤY DANH SÁCH NHÓM FACEBOOK THẬT TỪ CSDL (BỎ QUA CÁC NHÓM MOCK/TEST CŨ)
         with self.db.get_connection() as conn:
-            groups = conn.execute("""
-                SELECT * FROM fb_groups 
-                WHERE status IN ('APPROVED', 'PENDING')
-                ORDER BY members_count DESC 
-                LIMIT ?
-            """, (max_groups,)).fetchall()
+            if target_group_id and target_group_id != "ALL":
+                groups = conn.execute("""
+                    SELECT * FROM fb_groups 
+                    WHERE group_id = ? OR id = ?
+                """, (target_group_id, target_group_id)).fetchall()
+            else:
+                limit_val = 9999 if max_groups >= 999 else max_groups
+                groups = conn.execute("""
+                    SELECT * FROM fb_groups 
+                    WHERE status IN ('APPROVED', 'PENDING')
+                    ORDER BY members_count DESC 
+                    LIMIT ?
+                """, (limit_val,)).fetchall()
 
         if not groups:
             seeding_logger.warning(

@@ -377,6 +377,8 @@ export class AppComponent implements OnInit, OnDestroy {
   clickAnalytics?: ClickAnalytics;
   seedingHistory: SeedingHistoryItem[] = [];
   seedingLoading = false;
+  seedingMaxGroups = 10;
+  seedingTargetGroupId = 'ALL';
   selectedPreviewDeal?: Deal;
   showImageModal = false;
 
@@ -586,7 +588,11 @@ export class AppComponent implements OnInit, OnDestroy {
   triggerCommentSeeding(): void {
     this.seedingLoading = true;
     this.fetchSeedingLogs();
-    this.http.post<any>(`${this.apiUrl}/outreach/seed-comments?max_groups=3`, {}).subscribe({
+    let url = `${this.apiUrl}/outreach/seed-comments?max_groups=${this.seedingMaxGroups}`;
+    if (this.seedingTargetGroupId && this.seedingTargetGroupId !== 'ALL') {
+      url += `&group_id=${this.seedingTargetGroupId}`;
+    }
+    this.http.post<any>(url, {}).subscribe({
       next: (res) => {
         this.seedingLoading = false;
         this.triggerToast(res.message, 'success');

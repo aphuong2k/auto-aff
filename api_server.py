@@ -968,7 +968,7 @@ def get_item_price_history(item_id: str):
     }
 
 @app.post("/api/outreach/seed-comments")
-def trigger_seed_comments(max_groups: int = 3):
+def trigger_seed_comments(max_groups: int = 10, group_id: Optional[str] = None):
     load_env_vars()
     fb_cookie = os.getenv("FB_COOKIE", "")
     fb_profile = os.getenv("FB_CHROME_PROFILE", "")
@@ -978,7 +978,7 @@ def trigger_seed_comments(max_groups: int = 3):
             detail="Chưa cấu hình Cookie Facebook hoặc Chrome Profile! Vui lòng vào Cài Đặt để cập nhật tài khoản Facebook thật."
         )
     seeder = FacebookGroupSeeder(db)
-    results = seeder.run_seeding_scan(max_groups=max_groups)
+    results = seeder.run_seeding_scan(max_groups=max_groups, target_group_id=group_id)
     return {
         "status": "SUCCESS",
         "message": f"Đã quét và xử lý {len(results)} bình luận seeding trên các nhóm Facebook thật!",
