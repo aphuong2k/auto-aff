@@ -436,3 +436,114 @@ class ImageBannerStamper:
         img.save(banner_path, format="JPEG", quality=92)
         logging.info(f"🎨 Đã tạo thành công ảnh tiêu đề deal Shopee ngày {today_display}: {banner_path}")
         return banner_path
+
+    @classmethod
+    def create_voucher_banner(cls, date_str: str = "") -> Path:
+        """
+        Tạo ảnh Banner Infographic Voucher & Bí Kíp Săn Sale chuẩn Facebook (1080x1080)
+        Phục vụ cho các bài đăng dạng Cẩm nang mã giảm giá, Back mã, Tips săn deal 99K.
+        """
+        banner_path = PROCESSED_IMAGES_DIR / "daily_voucher_banner.jpg"
+        w, h = 1080, 1080
+        img = Image.new("RGB", (w, h), (15, 23, 42))
+        draw = ImageDraw.Draw(img)
+
+        today_display = date_str or datetime.now().strftime("%d/%m/%Y")
+
+        # 1. Vẽ nền gradient Emerald & Dark Indigo cao cấp
+        for y in range(h):
+            ratio = y / h
+            r = int(6 + (15 - 6) * ratio)
+            g = int(35 + (23 - 35) * ratio)
+            b = int(45 + (42 - 45) * ratio)
+            draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+        # 2. Header Bar phong cách Neon Emerald / Gold
+        header_h = 240
+        for y in range(header_h):
+            ratio = y / header_h
+            r = int(5 + (16 - 5) * ratio)
+            g = int(150 + (185 - 150) * ratio)
+            b = int(105 + (129 - 105) * ratio)
+            draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+        # Dải ngăn cách vàng kim rực rỡ
+        draw.line([(0, header_h), (w, header_h)], fill=(250, 204, 21), width=4)
+
+        # Chữ Header
+        font_subhead = cls._get_font(28, bold=True)
+        subhead_text = "🎟️ BẢN TIN KHO MÃ VOUCHER SHOPEE TOÀN SÀN 🎟️"
+        subhead_w = font_subhead.getlength(subhead_text)
+        draw.text(((w - subhead_w) // 2, 45), subhead_text, font=font_subhead, fill=(240, 253, 250))
+
+        font_main_title = cls._get_font(46, bold=True)
+        main_title = "BÍ KÍP CHỒNG 3 TẦNG MÃ GIẢM GIÁ"
+        title_w = font_main_title.getlength(main_title)
+        draw.text(((w - title_w) // 2, 115), main_title, font=font_main_title, fill=(255, 255, 255))
+
+        # 3. Card Ngày & Tình Trạng Kho Mã
+        date_box_top = 280
+        date_box_h = 130
+        draw.rounded_rectangle(
+            [(80, date_box_top), (w - 80, date_box_top + date_box_h)],
+            radius=24,
+            fill=(22, 30, 49),
+            outline=(16, 185, 129),
+            width=3
+        )
+
+        font_date_label = cls._get_font(24, bold=False)
+        date_label = "CẬP NHẬT KHO MÃ SĂN SALE TRONG NGÀY"
+        dl_w = font_date_label.getlength(date_label)
+        draw.text(((w - dl_w) // 2, date_box_top + 18), date_label, font=font_date_label, fill=(148, 163, 184))
+
+        font_date_val = cls._get_font(42, bold=True)
+        date_val = f"⚡ ÁP DỤNG NGÀY {today_display} • TỰ ĐỘNG BACK LƯỢT"
+        dv_w = font_date_val.getlength(date_val)
+        draw.text(((w - dv_w) // 2, date_box_top + 55), date_val, font=font_date_val, fill=(52, 211, 153))
+
+        # 4. 4 Thẻ Tính Năng Voucher Thực Chiến
+        features = [
+            ("🏷️ TẦNG 1: VOUCHER SHOPEE TOÀN SÀN", "Giảm 15% - 25% tối đa 100K - 500K cho mọi đơn hàng", (59, 130, 246)),
+            ("🚚 TẦNG 2: FREESHIP XTRA TOÀN QUỐC 0Đ", "Mã miễn phí ship giảm tới 70K lưu sẵn trong ví", (16, 185, 129)),
+            ("🎁 TẦNG 3: MÃ GIẢM RIÊNG CỦA SHOP MALL", "Áp chồng đồng thời cùng lúc 3 mã tại bước thanh toán", (236, 72, 153)),
+            ("⏰ MẸO BẬT/TẮT XU 0.1S SĂN DEAL 99K", "Bí kíp nhảy giá chớp nhoáng, không lo bị nghẽn thanh toán", (245, 158, 11))
+        ]
+
+        card_start_y = 450
+        card_h = 100
+        card_gap = 22
+
+        for idx, (f_title, f_desc, accent_color) in enumerate(features):
+            cy = card_start_y + idx * (card_h + card_gap)
+            draw.rounded_rectangle(
+                [(80, cy), (w - 80, cy + card_h)],
+                radius=18,
+                fill=(22, 30, 49),
+                outline=(51, 65, 85),
+                width=2
+            )
+            draw.rounded_rectangle([(80, cy), (94, cy + card_h)], radius=6, fill=accent_color)
+
+            f_font_t = cls._get_font(26, bold=True)
+            draw.text((120, cy + 18), f_title, font=f_font_t, fill=(255, 255, 255))
+
+            f_font_d = cls._get_font(18, bold=False)
+            draw.text((120, cy + 56), f_desc, font=f_font_d, fill=(148, 163, 184))
+
+        # 5. Thanh Footer CTA
+        footer_top = 950
+        draw.rounded_rectangle(
+            [(80, footer_top), (w - 80, footer_top + 80)],
+            radius=20,
+            fill=(16, 185, 129)
+        )
+        font_cta = cls._get_font(24, bold=True)
+        cta_text = "👉 BẤM LINK DƯỚI BÀI VIẾT ĐỂ LƯU MÃ VÀO VÍ NGAY 👈"
+        cta_w = font_cta.getlength(cta_text)
+        draw.text(((w - cta_w) // 2, footer_top + 25), cta_text, font=font_cta, fill=(255, 255, 255))
+
+        img.save(banner_path, format="JPEG", quality=92)
+        logging.info(f"🎨 Đã tạo thành công ảnh banner voucher Shopee ngày {today_display}: {banner_path}")
+        return banner_path
+

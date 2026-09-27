@@ -1,6 +1,7 @@
 @echo off
 title Shopee Affiliate Automation - Khoi chay BE va FE
 chcp 65001 >nul
+set "PATH=%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python313\Scripts;C:\nvm4w\nodejs;%PATH%"
 
 echo ========================================================
 echo   KHOI CHAY HE THONG SHOPEE AFFILIATE (BACKEND + FRONTEND)

@@ -47,7 +47,7 @@ def inspect_group_post_box():
             "div[role='button']:has-text('Bạn đang viết gì thế')",
             "div[role='button']:has-text('Write something')",
             "div[role='button']:has-text('Tạo bài viết')",
-            "div[role='button']:has-text('What\'s on your mind')",
+            "div[role='button']:has-text('on your mind')",
             "div[aria-label*='Tạo bài viết']",
             "div[aria-label*='Write something']",
             "span:has-text('Bạn viết gì đi')",

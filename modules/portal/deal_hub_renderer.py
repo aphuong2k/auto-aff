@@ -885,10 +885,13 @@ class DealHubRenderer:
             const h = canvas.height;
             const pad = 30;
 
-            // Dữ liệu mẫu nếu chưa đủ ngày
-            let points = [350000, 340000, 360000, 320000, 310000, 290000, 250000];
+            // Dữ liệu giá thật từ CSDL (tuyệt đối không dùng số giả lập)
+            let curPriceVal = parseInt((document.getElementById('modalItemPrice').innerText || '0').replace(/[^0-9]/g, '')) || 0;
+            let points = [curPriceVal, curPriceVal];
             if (history && history.length >= 2) {{
                 points = history.map(h => h.price);
+            }} else if (history && history.length === 1) {{
+                points = [history[0].price, curPriceVal || history[0].price];
             }}
 
             const max = Math.max(...points) * 1.1;

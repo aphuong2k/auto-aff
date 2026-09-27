@@ -4,6 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { interval, Subscription } from 'rxjs';
 
+import { ApiService } from './services/api.service';
+import { ToastService } from './services/toast.service';
+import { PollingService } from './services/polling.service';
+import { ToastComponent } from './components/toast/toast.component';
+import { SidebarComponent } from './components/sidebar/sidebar.component';
+import { GroupQualityWidgetComponent } from './components/group-quality-widget/group-quality-widget.component';
+
 interface Stats {
   categories_count: number;
   deals_today: number;
@@ -91,6 +98,22 @@ interface FbGroup {
   last_posted_at: string | null;
   matched_deal?: Deal;
   category_deals_count?: number;
+  health_score?: number;
+  health_verdict?: string;
+  posting_restricted?: number;
+  consecutive_rejections?: number;
+  requires_post_approval?: number;
+  post_success_rate?: number;
+  join_check_count?: number;
+  join_requested_at?: string;
+}
+
+export interface CategoryItem {
+  cat_id: number;
+  name: string;
+  deals_count?: number;
+  parent_id?: number;
+  is_active?: number;
 }
 
 interface LearnedKeyword {
@@ -176,10 +199,95 @@ interface PostedLogItem {
   posted_at: string;
 }
 
+export interface ClosedLoopCycle {
+  cycle_id: number;
+  cycle_number: number;
+  status: string;
+  total_groups: number;
+  completed_groups: number;
+  skipped_groups: number;
+  failed_groups: number;
+  current_group_pointer: number;
+  current_group_id?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface GroupScanRecord {
+  id: number;
+  execution_id: string;
+  group_id: string;
+  group_name: string;
+  category_name: string;
+  cycle_id: number;
+  scan_date: string;
+  status: string;
+  current_step: string;
+  deals_evaluated: number;
+  deal_posted_id?: string;
+  deal_posted_name?: string;
+  post_url?: string;
+  deals_seeded: number;
+  error_message?: string;
+  retry_count: number;
+  duration_seconds: number;
+  created_at: string;
+}
+
+export interface ClosedLoopDailyStats {
+  date: string;
+  total_groups: number;
+  scanned_today: number;
+  completed: number;
+  skipped: number;
+  failed: number;
+  deals_posted: number;
+  deals_seeded: number;
+  success_rate: number;
+  current_cycle: ClosedLoopCycle;
+}
+
+export interface ClosedLoopStatus {
+  cycle: ClosedLoopCycle;
+  total_groups: number;
+  current_pointer: number;
+  current_group?: any;
+  next_group?: any;
+  daily_stats: ClosedLoopDailyStats;
+  recent_scans: GroupScanRecord[];
+  runtime?: {
+    is_running: boolean;
+    current_action: string;
+    last_result?: any;
+    last_error?: string;
+  };
+}
+
+export interface AccountWorkloadItem {
+  id: number;
+  name: string;
+  is_active: number;
+  status: string;
+  daily_post_limit: number;
+  posts_today: number;
+  posts_current_cycle: number;
+  total_posts: number;
+  last_used_at?: string;
+  cooldown_until?: string;
+  is_in_cooldown: boolean;
+  cooldown_remaining_sec: number;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ToastComponent,
+    SidebarComponent,
+    GroupQualityWidgetComponent
+  ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
@@ -187,7 +295,18 @@ export class AppComponent implements OnInit, OnDestroy {
   apiUrl = 'http://localhost:8000/api';
   activeTab: 'dashboard' | 'deals' | 'marketing' | 'settings' | 'logs' = 'dashboard';
   dealsSubTab: 'deals' | 'promotions' | 'vouchers' = 'deals';
-  marketingSubTab: 'social_copilot' | 'posts' | 'seeding' | 'groups' = 'social_copilot';
+  marketingSubTab: 'closed_loop' | 'social_copilot' | 'posts' | 'seeding' | 'groups' = 'closed_loop';
+
+  // Closed-Loop Hub State
+  closedLoopStatus: ClosedLoopStatus | null = null;
+  closedLoopLoading = false;
+  closedLoopHistory: GroupScanRecord[] = [];
+  showDailyReportModal = false;
+
+  // Account Workload Balancer State
+  workloadAccounts: AccountWorkloadItem[] = [];
+  accountUsageHistory: any[] = [];
+
 
   // Trợ Lý Lan Tỏa Mạng Xã Hội (Social Outreach Copilot)
   selectedSocialDeal: any = null;
@@ -288,7 +407,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   deals: Deal[] = [];
   groups: FbGroup[] = [];
-  groupsFilterTab: 'ALL' | 'APPROVED' | 'DISCOVERED' | 'PENDING' = 'ALL';
+  groupsFilterTab: 'ALL' | 'APPROVED' | 'DISCOVERED' | 'PENDING' | 'HEALTHY' | 'GHOST' = 'ALL';
   syncingGroups = false;
   showAddGroupModal = false;
   newGroup = {
@@ -315,13 +434,96 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.groups.filter(g => g.status === 'DISCOVERED' || g.status === 'PENDING');
   }
 
+  get healthyGroups(): FbGroup[] {
+    return this.groups.filter(g => (g.health_score || 50) >= 60);
+  }
+
+  get ghostGroups(): FbGroup[] {
+    return this.groups.filter(g => (g.health_score || 50) < 30);
+  }
+
+  get displayedGroups(): FbGroup[] {
+    let list = this.groups;
+    if (this.groupsFilterTab === 'APPROVED') list = this.approvedGroups;
+    else if (this.groupsFilterTab === 'DISCOVERED') list = this.discoveredGroups;
+    else if (this.groupsFilterTab === 'PENDING') list = this.pendingGroups;
+    else if (this.groupsFilterTab === 'HEALTHY') list = this.healthyGroups;
+    else if (this.groupsFilterTab === 'GHOST') list = this.ghostGroups;
+
+    if (this.selectedGroupCategoryFilter !== 'ALL') {
+      list = list.filter(g => g.category_name === this.selectedGroupCategoryFilter);
+    }
+    return list;
+  }
+
+  checkSingleGroupHealth(g: FbGroup): void {
+    this.toast.info(`Đang kiểm tra chất lượng & tương tác nhóm [${g.name}]...`);
+    this.api.checkGroupHealth(g.url).subscribe({
+      next: (res) => {
+        g.health_score = res.health_score;
+        g.health_verdict = res.verdict;
+        this.toast.success(`Nhóm [${g.name}]: Điểm ${res.health_score}/100 (${res.verdict})`);
+      },
+      error: (err) => {
+        this.toast.error(`Lỗi kiểm tra nhóm: ` + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  checkSinglePending(g: FbGroup): void {
+    this.toast.info(`Đang kiểm tra phê duyệt tham gia nhóm [${g.name}]...`);
+    this.api.checkPendingJoin(g.url).subscribe({
+      next: (res) => {
+        if (res.approved) {
+          g.status = 'APPROVED';
+          this.toast.success(`Chúc mừng! Tài khoản đã được duyệt vào nhóm [${g.name}]!`);
+        } else if (res.status === 'TIMEOUT_LEFT') {
+          g.status = 'REJECTED';
+          this.toast.warning(`Yêu cầu vào nhóm [${g.name}] quá hạn 7 ngày, bot đã tự động hủy/rời nhóm.`);
+        } else {
+          this.toast.info(`Yêu cầu vào nhóm [${g.name}] vẫn đang chờ Admin duyệt.`);
+        }
+        this.fetchGroups();
+      },
+      error: (err) => {
+        this.toast.error(`Lỗi check duyệt nhóm: ` + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  leaveSingleGroup(g: FbGroup): void {
+    if (!confirm(`Bạn có chắc muốn tự động rời khỏi nhóm [${g.name}]?`)) {
+      return;
+    }
+    this.toast.info(`Đang tiến hành rời khỏi nhóm [${g.name}]...`);
+    this.api.leaveFbGroup(g.url).subscribe({
+      next: (res) => {
+        this.toast.success(`Đã rời nhóm [${g.name}] thành công.`);
+        this.fetchGroups();
+      },
+      error: (err) => {
+        this.toast.error(`Lỗi khi rời nhóm: ` + (err.error?.detail || err.message));
+      }
+    });
+  }
+
   // Gradual Posting & Matching State
-  gradualPostingState: any = { is_running: false, total_target: 0, completed: 0, current_group: '', status: 'IDLE' };
+  gradualPostingState: any = { is_running: false, total_target: 0, completed: 0, current_group: '', remaining_delay: 0, delay_seconds: 60, status: 'IDLE' };
   gradualMaxGroups: number = 3;
-  gradualDelaySeconds: number = 180;
+  gradualDelaySeconds: number = 60;
   postingSingleGroup: { [groupId: string]: boolean } = {};
   gradualPollingTimer: any = null;
   selectedGroupCategoryFilter: string = 'ALL';
+
+  // --- Chọn Nhóm Đăng Bài Tuần Tự (Batch Select) ---
+  selectedGroupIds: string[] = [];
+
+  // --- Quét & Chọn Nhóm Ngành Kích Hoạt Chạy Ngay ---
+  showRunModal: boolean = false;
+  categoriesList: CategoryItem[] = [];
+  selectedCategoryIds: number[] = [];
+  loadingCategories: boolean = false;
+  scanningCategories: boolean = false;
 
   get filteredApprovedGroups(): FbGroup[] {
     const list = this.groups.filter(g => g.status === 'APPROVED');
@@ -362,6 +564,10 @@ export class AppComponent implements OnInit, OnDestroy {
   collageImageUrl = 'http://localhost:8000/api/outreach/collage-image';
   generatingHeaderBanner = false;
   headerBannerImageUrl = 'http://localhost:8000/api/outreach/header-banner-image';
+  generatingVoucherBanner = false;
+  voucherBannerImageUrl = 'http://localhost:8000/api/outreach/voucher-banner-image';
+
+  previewCustomModal: { url: string; title: string; subtitle?: string; downloadName?: string } | null = null;
 
   postedLogs: PostedLogItem[] = [];
   postedLogsLoading = false;
@@ -390,11 +596,29 @@ export class AppComponent implements OnInit, OnDestroy {
 
   toastMessage = '';
   toastType: 'success' | 'error' | 'info' = 'info';
+  toastTitle = '';
   showToast = false;
+  toastTimer: any = null;
 
   testingShopee = false;
   testingTelegram = false;
   testingLazada = false;
+
+  // Facebook Multi-Account Rotation State
+  fbAccounts: any[] = [];
+  loadingFbAccounts = false;
+  showAddFbAccountModal = false;
+  newFbAccount = {
+    name: '',
+    cookie: '',
+    profile_path: '',
+    daily_post_limit: 5,
+    daily_join_limit: 3,
+    proxy: '',
+    notes: ''
+  };
+  testingFbAccount: { [id: number]: boolean } = {};
+  rotatingPreview: any = null;
 
   // Bộ lọc sàn & độ tươi deals
   dealPlatformFilter: 'ALL' | 'SHOPEE' | 'LAZADA' = 'ALL';
@@ -409,37 +633,37 @@ export class AppComponent implements OnInit, OnDestroy {
   importingCsv = false;
   csvPlatform: 'SHOPEE' | 'LAZADA' = 'SHOPEE';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    public api: ApiService,
+    public toast: ToastService,
+    public polling: PollingService
+  ) {}
 
   ngOnInit(): void {
+    // 1. Chỉ tải dữ liệu cốt lõi khi khởi động ứng dụng
     this.fetchStats();
     this.fetchHealth();
     this.fetchSchedule();
-    this.fetchConfig();
-    this.fetchDeals();
-    this.fetchGroups();
-    this.fetchLearnedKeywords();
-    this.fetchPromotions();
-    this.fetchPromotionConfig();
-    this.fetchClickAnalytics();
-    this.fetchSeedingHistory();
-    this.fetchGeneralPosts();
-    this.fetchPostedLogs();
-    this.fetchCommissions();
-    this.fetchVoucherCodes();
-    this.fetchGeneratedPromoPosts();
-    this.fetchWorkflowReports();
 
-    this.pollSub = interval(3500).subscribe(() => {
+    // 2. Tải dữ liệu tương ứng tab khởi đầu (Lazy loading)
+    this.switchTab(this.activeTab);
+
+    // 3. Cơ chế Polling thích ứng thông minh (3s khi chạy, 15s khi nghỉ)
+    this.pollSub = this.polling.pollTrigger$.subscribe((tab) => {
       this.fetchStats();
       this.fetchHealth();
-      if (this.activeTab === 'settings' || this.stats.is_running || this.runningWorkflowStep) {
+      if (tab === 'dashboard' || (tab === 'marketing' && this.marketingSubTab === 'closed_loop') || this.closedLoopLoading) {
+        this.loadClosedLoopStatus();
+        this.loadWorkloadStatus();
+      }
+      if (tab === 'settings' || this.stats.is_running || this.runningWorkflowStep) {
         this.fetchWorkflowReports();
       }
-      if (this.activeTab === 'logs' && this.autoRefreshLogs) {
+      if (tab === 'logs' && this.autoRefreshLogs) {
         this.fetchLogs();
       }
-      if (this.activeTab === 'marketing' && this.autoRefreshSeedingLogs && this.marketingSubTab === 'seeding') {
+      if (tab === 'marketing' && this.autoRefreshSeedingLogs && this.marketingSubTab === 'seeding') {
         this.fetchSeedingLogs();
       }
     });
@@ -481,6 +705,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     this.activeTab = tab as any;
+    this.polling.setActiveTab(this.activeTab);
     if (tab === 'dashboard') {
       this.fetchStats();
       this.fetchCommissions();
@@ -505,6 +730,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (tab === 'settings') {
       this.fetchConfig();
       this.fetchSchedule();
+      this.fetchFbAccounts();
     }
     if (tab === 'logs') {
       this.fetchLogs();
@@ -524,8 +750,11 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  setMarketingSubTab(sub: 'social_copilot' | 'posts' | 'seeding' | 'groups'): void {
+  setMarketingSubTab(sub: 'closed_loop' | 'social_copilot' | 'posts' | 'seeding' | 'groups'): void {
     this.marketingSubTab = sub;
+    if (sub === 'closed_loop') {
+      this.loadClosedLoopStatus();
+    }
     if (sub === 'social_copilot') {
       if (!this.selectedSocialDeal && this.deals.length > 0) {
         this.selectedSocialDeal = this.deals[0];
@@ -700,6 +929,29 @@ export class AppComponent implements OnInit, OnDestroy {
         this.triggerToast(err.message || 'Lỗi khi tạo ảnh tiêu đề!', 'error');
       }
     });
+  }
+
+  generateVoucherBanner(): void {
+    this.generatingVoucherBanner = true;
+    this.http.post<any>(`${this.apiUrl}/outreach/generate-voucher-banner`, {}).subscribe({
+      next: (res) => {
+        this.generatingVoucherBanner = false;
+        this.voucherBannerImageUrl = `${this.apiUrl}/outreach/voucher-banner-image?t=${Date.now()}`;
+        this.triggerToast(res.message, 'success');
+      },
+      error: (err) => {
+        this.generatingVoucherBanner = false;
+        this.triggerToast(err.message || 'Lỗi khi tạo ảnh banner voucher!', 'error');
+      }
+    });
+  }
+
+  openCustomImage(url: string, title: string, subtitle?: string, downloadName?: string): void {
+    this.previewCustomModal = { url, title, subtitle, downloadName: downloadName || 'banner.jpg' };
+  }
+
+  closeCustomImage(): void {
+    this.previewCustomModal = null;
   }
 
   fetchPostedLogs(): void {
@@ -1322,7 +1574,7 @@ export class AppComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.gradualPostingState = res;
         if (res.is_running && !this.gradualPollingTimer) {
-          this.gradualPollingTimer = setInterval(() => this.fetchGradualPostingStatus(), 3000);
+          this.gradualPollingTimer = setInterval(() => this.fetchGradualPostingStatus(), 1500);
         } else if (!res.is_running && this.gradualPollingTimer) {
           clearInterval(this.gradualPollingTimer);
           this.gradualPollingTimer = null;
@@ -1334,12 +1586,95 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  // --- Group Selection Methods for Sequential Posting ---
+  isGroupSelected(groupId: string): boolean {
+    return this.selectedGroupIds.includes(String(groupId));
+  }
+
+  toggleGroupSelect(groupId: string): void {
+    const gid = String(groupId);
+    const idx = this.selectedGroupIds.indexOf(gid);
+    if (idx > -1) {
+      this.selectedGroupIds.splice(idx, 1);
+    } else {
+      this.selectedGroupIds.push(gid);
+    }
+  }
+
+  isAllGroupsSelected(): boolean {
+    const targetGroups = this.groupsFilterTab === 'ALL'
+      ? this.groups
+      : (this.groupsFilterTab === 'APPROVED' ? this.approvedGroups : (this.groupsFilterTab === 'DISCOVERED' ? this.discoveredGroups : this.pendingGroups));
+    if (!targetGroups || targetGroups.length === 0) return false;
+    return targetGroups.every(g => this.selectedGroupIds.includes(String(g.group_id)));
+  }
+
+  toggleSelectAllGroups(event?: any): void {
+    const targetGroups = this.groupsFilterTab === 'ALL'
+      ? this.groups
+      : (this.groupsFilterTab === 'APPROVED' ? this.approvedGroups : (this.groupsFilterTab === 'DISCOVERED' ? this.discoveredGroups : this.pendingGroups));
+
+    if (this.isAllGroupsSelected()) {
+      const targetIds = new Set(targetGroups.map(g => String(g.group_id)));
+      this.selectedGroupIds = this.selectedGroupIds.filter(id => !targetIds.has(id));
+    } else {
+      const newIds = new Set(this.selectedGroupIds);
+      targetGroups.forEach(g => newIds.add(String(g.group_id)));
+      this.selectedGroupIds = Array.from(newIds);
+    }
+  }
+
+  selectAllApprovedGroups(): void {
+    this.selectedGroupIds = this.approvedGroups.map(g => String(g.group_id));
+    this.triggerToast(`Đã chọn toàn bộ ${this.selectedGroupIds.length} nhóm đã duyệt!`, 'info');
+  }
+
+  deselectAllGroups(): void {
+    this.selectedGroupIds = [];
+  }
+
+  startSequentialPosting(): void {
+    if (this.gradualPostingState.is_running) {
+      this.triggerToast('Tiến trình đăng bài đang chạy, vui lòng chờ hoặc bấm Dừng!', 'info');
+      return;
+    }
+
+    let targetIds = [...this.selectedGroupIds];
+    if (targetIds.length === 0) {
+      const approved = this.approvedGroups;
+      if (approved.length === 0) {
+        this.triggerToast('Không có nhóm nào ở trạng thái ĐÃ THAM GIA (APPROVED) để đăng bài!', 'error');
+        return;
+      }
+      this.selectAllApprovedGroups();
+      targetIds = this.approvedGroups.map(g => String(g.group_id));
+    }
+
+    const delay = this.gradualDelaySeconds || 60;
+    this.triggerToast(`Đang khởi động đăng bài tuần tự vào ${targetIds.length} nhóm (nhịp nghỉ ${delay}s giữa các bài)...`, 'info');
+
+    this.http.post<any>(`${this.apiUrl}/outreach/start-gradual-posting`, {
+      group_ids: targetIds,
+      delay_seconds: delay,
+      min_delay_seconds: delay,
+      max_delay_seconds: delay
+    }).subscribe({
+      next: (res) => {
+        this.triggerToast(res.message, 'success');
+        this.fetchGradualPostingStatus();
+      },
+      error: (err) => this.triggerToast(err.error?.detail || err.message || 'Lỗi khởi động đăng bài tuần tự!', 'error')
+    });
+  }
+
   startGradualPosting(): void {
-    this.triggerToast('Đang khởi động tiến trình đăng bài dần vào các nhóm...', 'info');
+    const delay = this.gradualDelaySeconds || 60;
+    this.triggerToast(`Đang khởi động tiến trình đăng bài dần vào ${this.gradualMaxGroups} nhóm...`, 'info');
     this.http.post<any>(`${this.apiUrl}/outreach/start-gradual-posting`, {
       max_groups: this.gradualMaxGroups,
-      min_delay_seconds: this.gradualDelaySeconds,
-      max_delay_seconds: Math.round(this.gradualDelaySeconds * 1.5)
+      delay_seconds: delay,
+      min_delay_seconds: delay,
+      max_delay_seconds: delay
     }).subscribe({
       next: (res) => {
         this.triggerToast(res.message, 'success');
@@ -1428,7 +1763,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.http.post<any>(`${this.apiUrl}/test/shopee-aff`, {}).subscribe({
       next: (res) => {
         this.testingShopeeAff = false;
-        this.triggerToast(res.message, 'success');
+        this.triggerToast(res.message, res.status === 'SUCCESS' ? 'success' : 'info');
       },
       error: (err) => {
         this.testingShopeeAff = false;
@@ -1467,23 +1802,137 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  runWorkflowNow(): void {
+  // --- Category Selection & Workflow Run Methods ---
+  getCategoryIcon(name: string): string {
+    const nl = (name || '').toLowerCase();
+    if (nl.includes('nam')) return '👔';
+    if (nl.includes('nữ')) return '👗';
+    if (nl.includes('điện tử') || nl.includes('công nghệ') || nl.includes('điện thoại')) return '📱';
+    if (nl.includes('máy tính') || nl.includes('laptop')) return '💻';
+    if (nl.includes('mẹ') || nl.includes('bé') || nl.includes('trẻ em')) return '🍼';
+    if (nl.includes('nhà') || nl.includes('đời sống') || nl.includes('gia dụng')) return '🏠';
+    if (nl.includes('sắc đẹp') || nl.includes('mỹ phẩm')) return '💄';
+    if (nl.includes('thể thao') || nl.includes('dã ngoại')) return '⚽';
+    if (nl.includes('giày')) return '👟';
+    if (nl.includes('túi') || nl.includes('ví')) return '👜';
+    if (nl.includes('đồng hồ')) return '⌚';
+    if (nl.includes('sách')) return '📚';
+    if (nl.includes('xe')) return '🏍️';
+    if (nl.includes('thực phẩm') || nl.includes('bách hóa')) return '🛒';
+    return '📦';
+  }
+
+  openRunModal(): void {
     if (this.stats.is_running) {
       this.triggerToast('Hệ thống đang chạy một tiến trình khác!', 'info');
       return;
     }
+    this.showRunModal = true;
+    if (this.categoriesList.length === 0) {
+      this.fetchCategories();
+    }
+  }
 
-    this.http.post(`${this.apiUrl}/run?cats=2`, {}).subscribe({
-      next: (res: any) => {
+  closeRunModal(): void {
+    this.showRunModal = false;
+  }
+
+  fetchCategories(): void {
+    this.loadingCategories = true;
+    this.http.get<{ categories: CategoryItem[]; total: number }>(`${this.apiUrl}/categories`).subscribe({
+      next: (res) => {
+        this.loadingCategories = false;
+        this.categoriesList = res.categories || [];
+        if (this.selectedCategoryIds.length === 0 && this.categoriesList.length > 0) {
+          this.selectPopularCategories();
+        }
+      },
+      error: (err) => {
+        this.loadingCategories = false;
+        this.triggerToast('Lỗi nạp danh mục ngành hàng: ' + err.message, 'error');
+      }
+    });
+  }
+
+  scanCategories(): void {
+    this.scanningCategories = true;
+    this.triggerToast('Đang kết nối API Shopee để quét cây danh mục mới nhất...', 'info');
+    this.http.post<{ categories: CategoryItem[]; total: number; message: string }>(`${this.apiUrl}/categories/scan`, {}).subscribe({
+      next: (res) => {
+        this.scanningCategories = false;
+        this.categoriesList = res.categories || [];
+        this.triggerToast(res.message || 'Đã quét lại danh mục từ Shopee thành công!', 'success');
+      },
+      error: (err) => {
+        this.scanningCategories = false;
+        this.triggerToast(err.error?.detail || err.message || 'Lỗi quét danh mục từ Shopee!', 'error');
+      }
+    });
+  }
+
+  isCategorySelected(catId: number): boolean {
+    return this.selectedCategoryIds.includes(catId);
+  }
+
+  toggleCategory(catId: number): void {
+    const idx = this.selectedCategoryIds.indexOf(catId);
+    if (idx > -1) {
+      this.selectedCategoryIds.splice(idx, 1);
+    } else {
+      this.selectedCategoryIds.push(catId);
+    }
+  }
+
+  selectAllCategories(): void {
+    this.selectedCategoryIds = this.categoriesList.map(c => c.cat_id);
+  }
+
+  deselectAllCategories(): void {
+    this.selectedCategoryIds = [];
+  }
+
+  selectPopularCategories(): void {
+    const popularKeywords = ['nam', 'nữ', 'điện tử', 'máy tính', 'nhà cửa', 'mẹ & bé', 'sắc đẹp'];
+    const matched = this.categoriesList.filter(c => {
+      const nl = (c.name || '').toLowerCase();
+      return popularKeywords.some(kw => nl.includes(kw));
+    });
+    if (matched.length > 0) {
+      this.selectedCategoryIds = matched.map(c => c.cat_id);
+    } else {
+      this.selectedCategoryIds = this.categoriesList.slice(0, 3).map(c => c.cat_id);
+    }
+  }
+
+  executeWorkflowRun(): void {
+    if (this.selectedCategoryIds.length === 0) {
+      this.triggerToast('Vui lòng chọn ít nhất 1 nhóm ngành để chạy!', 'info');
+      return;
+    }
+    const count = this.selectedCategoryIds.length;
+    this.closeRunModal();
+    this.stats.is_running = true;
+    this.triggerToast(`Đang kích hoạt chu trình cho ${count} ngành hàng đã chọn...`, 'info');
+
+    this.http.post<any>(`${this.apiUrl}/run`, {
+      category_ids: this.selectedCategoryIds,
+      cats: count
+    }).subscribe({
+      next: (res) => {
         this.triggerToast(res.message || 'Đã kích hoạt chu trình!', 'success');
         this.stats.is_running = true;
         this.activeTab = 'logs';
         this.fetchLogs();
       },
       error: (err) => {
+        this.stats.is_running = false;
         this.triggerToast(err.error?.detail || 'Lỗi khởi động chu trình: ' + err.message, 'error');
       }
     });
+  }
+
+  runWorkflowNow(): void {
+    this.openRunModal();
   }
 
   clearDeals(): void {
@@ -1533,14 +1982,32 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   resetAllData(): void {
-    this.http.post(`${this.apiUrl}/data/reset`, {}).subscribe({
-      next: (res: any) => {
+    if (!confirm('Bạn có chắc muốn xóa sạch toàn bộ sản phẩm và nhóm ảo để bắt đầu dữ liệu thật 100%?')) {
+      return;
+    }
+    this.http.post<any>(`${this.apiUrl}/data/reset`, {}).subscribe({
+      next: (res) => {
         this.deals = [];
         this.groups = [];
+        this.commissions = [];
+        this.commissionStats = null;
+        this.subscribers = [];
+        this.voucherCodes = [];
+        this.promoGeneratedPosts = null;
+        this.selectedSocialDeal = null;
+        this.socialGeneratedPack = null;
+        this.postedLogs = [];
+        this.seedingHistory = [];
+        this.categoryInventory = {};
+        this.clickAnalytics = { total_clicks: 0, channels: [], top_items: [], daily_trend: [] };
+
         this.fetchStats();
-        this.triggerToast(res.message || 'Đã làm sạch toàn bộ dữ liệu sản phẩm & nhóm ảo!', 'info');
+        this.fetchHealth();
+        this.fetchFbAccounts();
+        this.fetchWorkflowReports();
+        this.triggerToast(res.message || 'Đã làm sạch toàn bộ dữ liệu ảo thành công!', 'success');
       },
-      error: (err) => this.triggerToast('Lỗi dọn dẹp dữ liệu: ' + err.message, 'error')
+      error: (err) => this.triggerToast('Lỗi dọn dẹp dữ liệu: ' + (err.error?.detail || err.message), 'error')
     });
   }
 
@@ -1639,12 +2106,224 @@ export class AppComponent implements OnInit, OnDestroy {
     reader.readAsText(file);
   }
 
-  triggerToast(msg: string, type: 'success' | 'error' | 'info' = 'info'): void {
+  triggerToast(msg: string, type: 'success' | 'error' | 'info' = 'info', title?: string): void {
     this.toastMessage = msg;
     this.toastType = type;
+    this.toastTitle = title || (type === 'success' ? 'Thành Công' : (type === 'error' ? 'Lỗi / Cảnh Báo' : 'Thông Báo Hệ Thống'));
     this.showToast = true;
-    setTimeout(() => {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = setTimeout(() => {
       this.showToast = false;
-    }, 5000);
+    }, 5500);
+  }
+
+  closeToast(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+    this.showToast = false;
+  }
+
+  // --- Facebook Multi-Account Management Methods ---
+  fetchFbAccounts(): void {
+    this.loadingFbAccounts = true;
+    this.http.get<any>(`${this.apiUrl}/facebook/accounts`).subscribe({
+      next: (res) => {
+        this.loadingFbAccounts = false;
+        this.fbAccounts = res.accounts || [];
+      },
+      error: (err) => {
+        this.loadingFbAccounts = false;
+        console.error('Lỗi tải danh sách tài khoản FB:', err);
+      }
+    });
+  }
+
+  addFbAccount(): void {
+    if (!this.newFbAccount.name || !this.newFbAccount.cookie) {
+      this.triggerToast('Vui lòng nhập Tên nick và Cookie Facebook!', 'error');
+      return;
+    }
+    this.http.post<any>(`${this.apiUrl}/facebook/accounts`, this.newFbAccount).subscribe({
+      next: (res) => {
+        this.triggerToast(res.message || 'Đã thêm tài khoản Facebook thành công!', 'success');
+        this.showAddFbAccountModal = false;
+        this.newFbAccount = {
+          name: '',
+          cookie: '',
+          profile_path: '',
+          daily_post_limit: 5,
+          daily_join_limit: 3,
+          proxy: '',
+          notes: ''
+        };
+        this.fetchFbAccounts();
+      },
+      error: (err) => this.triggerToast(err.error?.detail || err.message, 'error')
+    });
+  }
+
+  toggleFbAccount(account: any): void {
+    this.http.post<any>(`${this.apiUrl}/facebook/accounts/${account.id}/toggle`, {}).subscribe({
+      next: (res) => {
+        account.is_active = res.is_active;
+        this.triggerToast(`Đã ${account.is_active ? 'bật' : 'tắt'} tài khoản [${account.name}]`, 'info');
+      },
+      error: (err) => this.triggerToast(err.message, 'error')
+    });
+  }
+
+  testFbAccount(account: any): void {
+    this.testingFbAccount[account.id] = true;
+    this.http.post<any>(`${this.apiUrl}/facebook/accounts/${account.id}/test`, {}).subscribe({
+      next: (res) => {
+        this.testingFbAccount[account.id] = false;
+        if (res.status === 'success') {
+          account.status = 'ACTIVE';
+          this.triggerToast(`✅ Nick [${account.name}]: ${res.message}`, 'success');
+        } else {
+          account.status = res.suggested_status || 'CHECKPOINT';
+          this.triggerToast(`⚠️ Nick [${account.name}]: ${res.message}`, 'error');
+        }
+      },
+      error: (err) => {
+        this.testingFbAccount[account.id] = false;
+        this.triggerToast(err.message || 'Lỗi khi test tài khoản', 'error');
+      }
+    });
+  }
+
+  deleteFbAccount(account: any): void {
+    if (!confirm(`Bạn có chắc chắn muốn xóa tài khoản [${account.name}]?`)) return;
+    this.http.delete<any>(`${this.apiUrl}/facebook/accounts/${account.id}`).subscribe({
+      next: (res) => {
+        this.triggerToast(res.message || 'Đã xóa tài khoản Facebook!', 'info');
+        this.fetchFbAccounts();
+      },
+      error: (err) => this.triggerToast(err.message, 'error')
+    });
+  }
+
+  previewNextRotatingAccount(): void {
+    this.http.post<any>(`${this.apiUrl}/facebook/accounts/rotate-preview`, {}).subscribe({
+      next: (res) => {
+        this.rotatingPreview = res;
+        if (res.account) {
+          this.triggerToast(`🔄 Lượt tiếp theo sẽ dùng nick: [${res.account.name}] (Đã đăng ${res.account.posts_today}/${res.account.daily_post_limit} bài)`, 'info');
+        } else {
+          this.triggerToast('⚠️ ' + (res.message || 'Không có nick nào sẵn sàng'), 'error');
+        }
+      },
+      error: (err) => this.triggerToast(err.message, 'error')
+    });
+  }
+
+  // --- CLOSED-LOOP WORKFLOW HUB METHODS ---
+
+  loadClosedLoopStatus(): void {
+    this.http.get<ClosedLoopStatus>(`${this.apiUrl}/closed-loop/status`).subscribe({
+      next: (data) => {
+        this.closedLoopStatus = data;
+        this.closedLoopHistory = data.recent_scans || [];
+      },
+      error: (err) => console.error('Error loading closed loop status:', err)
+    });
+  }
+
+  runClosedLoopNext(): void {
+    this.closedLoopLoading = true;
+    this.http.post<any>(`${this.apiUrl}/closed-loop/run-next`, {}).subscribe({
+      next: (res) => {
+        this.triggerToast('🚀 Đang xử lý Node Group tiếp theo...', 'info');
+        setTimeout(() => {
+          this.loadClosedLoopStatus();
+          this.closedLoopLoading = false;
+        }, 3000);
+      },
+      error: (err) => {
+        this.triggerToast(err.error?.detail || 'Lỗi khi chạy nhóm tiếp theo!', 'error');
+        this.closedLoopLoading = false;
+      }
+    });
+  }
+
+  runClosedLoopCycle(): void {
+    if (!confirm('Bạn có chắc chắn muốn kích hoạt chạy tự động toàn bộ chu kỳ nhóm hiện tại?')) return;
+    this.closedLoopLoading = true;
+    this.http.post<any>(`${this.apiUrl}/closed-loop/run-cycle`, {}).subscribe({
+      next: (res) => {
+        this.triggerToast('⚡ Đã bắt đầu chạy toàn bộ chu kỳ nhóm tự động!', 'success');
+        setTimeout(() => {
+          this.loadClosedLoopStatus();
+          this.closedLoopLoading = false;
+        }, 3000);
+      },
+      error: (err) => {
+        this.triggerToast(err.error?.detail || 'Lỗi khi chạy chu kỳ!', 'error');
+        this.closedLoopLoading = false;
+      }
+    });
+  }
+
+  collectCentralDeals(): void {
+    this.closedLoopLoading = true;
+    this.http.post<any>(`${this.apiUrl}/closed-loop/collect-deals`, {}).subscribe({
+      next: (res) => {
+        this.triggerToast('🔍 Đang cào và thẩm định deal trung tâm theo Quality Gate...', 'info');
+        setTimeout(() => {
+          this.loadClosedLoopStatus();
+          this.fetchDeals();
+          this.closedLoopLoading = false;
+        }, 3500);
+      },
+      error: (err) => {
+        this.triggerToast(err.error?.detail || 'Lỗi khi thu thập deal!', 'error');
+        this.closedLoopLoading = false;
+      }
+    });
+  }
+
+  retryClosedLoopNode(groupId: string): void {
+    this.http.post<any>(`${this.apiUrl}/closed-loop/retry-node`, { group_id: groupId }).subscribe({
+      next: (res) => {
+        this.triggerToast(res.message || 'Đã kích hoạt thử lại node!', 'success');
+        this.loadClosedLoopStatus();
+      },
+      error: (err) => {
+        this.triggerToast(err.error?.detail || 'Lỗi khi thử lại node!', 'error');
+      }
+    });
+  }
+
+  openDailyReportModal(): void {
+    this.showDailyReportModal = true;
+  }
+
+  closeDailyReportModal(): void {
+    this.showDailyReportModal = false;
+  }
+
+  loadWorkloadStatus(): void {
+    this.http.get<any>(`${this.apiUrl}/accounts/workload`).subscribe({
+      next: (data) => {
+        this.workloadAccounts = data.accounts || [];
+        this.accountUsageHistory = data.history || [];
+      },
+      error: (err) => console.error('Error loading workload status:', err)
+    });
+  }
+
+  releaseAccountCooldown(accountId: number): void {
+    this.http.post<any>(`${this.apiUrl}/accounts/${accountId}/release-cooldown`, {}).subscribe({
+      next: (res) => {
+        this.triggerToast(res.message || 'Đã giải phóng thời gian chờ Cooldown!', 'success');
+        this.loadWorkloadStatus();
+        this.loadClosedLoopStatus();
+      },
+      error: (err) => this.triggerToast(err.error?.detail || err.message, 'error')
+    });
   }
 }

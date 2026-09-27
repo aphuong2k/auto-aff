@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from config.settings import FB_SEEDING_LOG_PATH
+from config.category_mapping import CategoryMatcher
 from database.db_manager import DatabaseManager
 from modules.affiliate.content_writer import DealContentWriter
 from modules.affiliate.link_converter import AffiliateLinkConverter
@@ -55,6 +56,7 @@ class FacebookGroupSeeder:
     def __init__(self, db: Optional[DatabaseManager] = None):
         self.db = db or DatabaseManager()
         self.link_converter = AffiliateLinkConverter()
+        self.matcher = CategoryMatcher()
 
     def has_buying_intent(self, text: str) -> Tuple[bool, str]:
         """
@@ -70,39 +72,27 @@ class FacebookGroupSeeder:
         return False, ""
 
     def find_best_matching_deal(self, post_text: str = "", category_name: Optional[str] = None) -> Optional[Dict]:
-        """Tìm sản phẩm đúng 100% ngành hàng của Group Facebook (Strict Category Matching)"""
+        """Tìm sản phẩm đúng 100% ngành hàng dựa trên CategoryMatcher config-driven."""
+        target_cat = category_name or ""
+        combined_context = f"{target_cat} {post_text}"
+
         with self.db.get_connection() as conn:
-            target_cat = category_name or ""
-            cat_keywords = {
-                "Thiết Bị Điện Tử": ["điện tử", "tai nghe", "cáp", "sạc", "chuột", "bàn phím", "loa", "công nghệ", "phụ kiện"],
-                "Thiết Bị Điện Gia Dụng": ["gia dụng", "nồi", "chảo", "máy", "bếp", "lau", "nhà cửa"],
-                "Thời Trang Nam": ["thời trang nam", "quần nam", "áo nam"],
-                "Thời Trang": ["thời trang", "áo", "quần", "dép", "giày", "túi"],
-                "Sắc Đẹp": ["sắc đẹp", "mỹ phẩm", "skincare", "son", "kem", "serum", "dưỡng", "làm đẹp"],
-                "Mẹ & Bé": ["mẹ & bé", "mẹ và bé", "tã", "bỉm", "sữa", "đồ chơi", "trẻ em"]
-            }
-
-            combined_context = f"{target_cat} {post_text}".lower()
-
-            # 1. Phát hiện ngành hàng phù hợp từ ngữ cảnh bài đăng hoặc tên nhóm
-            detected_category = None
-            for cat_name, kws in cat_keywords.items():
-                if any(kw in combined_context for kw in kws):
-                    detected_category = cat_name
-                    break
-
-            if detected_category:
-                rows = conn.execute("""
+            # 1. Phát hiện ngành hàng từ ngữ cảnh bài viết (dùng seeder_keywords)
+            text_match = self.matcher.detect_category_from_text(combined_context)
+            if text_match:
+                category_condition = self.matcher.build_deal_query_conditions(text_match)
+                rows = conn.execute(f"""
                     SELECT * FROM deals 
-                    WHERE category_name LIKE ? 
+                    WHERE ({category_condition}) 
                     ORDER BY deal_score DESC 
                     LIMIT 5
-                """, (f"%{detected_category}%",)).fetchall()
+                """).fetchall()
                 if rows:
                     return dict(random.choice(rows))
-                
-                # Tìm sản phẩm có tên chứa từ khóa cốt lõi
-                for kw in cat_keywords[detected_category]:
+
+                # Fallback: tìm deal có tên chứa keyword
+                seeder_kws = self.matcher.get_seeder_keywords(text_match)
+                for kw in seeder_kws:
                     row = conn.execute("""
                         SELECT * FROM deals 
                         WHERE name LIKE ? 
@@ -114,16 +104,19 @@ class FacebookGroupSeeder:
 
             # 2. Khớp theo category_name trực tiếp nếu chưa phát hiện
             if target_cat:
-                rows = conn.execute("""
-                    SELECT * FROM deals 
-                    WHERE category_name LIKE ? 
-                    ORDER BY deal_score DESC 
-                    LIMIT 5
-                """, (f"%{target_cat}%",)).fetchall()
-                if rows:
-                    return dict(random.choice(rows))
+                cat_match = self.matcher.match_group(group_cat=target_cat)
+                if cat_match["matched_by"] != "general":
+                    cat_condition = self.matcher.build_deal_query_conditions(cat_match)
+                    rows = conn.execute(f"""
+                        SELECT * FROM deals 
+                        WHERE ({cat_condition})
+                        ORDER BY deal_score DESC 
+                        LIMIT 5
+                    """).fetchall()
+                    if rows:
+                        return dict(random.choice(rows))
 
-            # 3. Lấy deal có điểm cao nhất trong database
+            # 3. Lấy deal có điểm cao nhất trong database (fallback)
             rows = conn.execute("""
                 SELECT * FROM deals 
                 ORDER BY deal_score DESC 
@@ -151,6 +144,150 @@ class FacebookGroupSeeder:
         deal_copy = dict(deal)
         deal_copy["aff_url"] = chosen_url
         return DealContentWriter.generate_comment_seeding_post(deal_copy, query_context=post_context)
+
+    def can_seed_group(self, group_id: str, max_per_day: int = 2) -> bool:
+        """Kiểm tra giới hạn rate limit: tối đa max_per_day bình luận/nhóm/ngày"""
+        daily_count = self.db.get_seeding_comments_today_count(group_id)
+        return daily_count < max_per_day
+
+    def submit_comment(self, page, post_url: str, comment_text: str, image_path: Optional[str] = None) -> Dict:
+        """
+        Thực hiện submit bình luận vào bài viết Facebook thông qua Playwright.
+        - Mở post_url
+        - Kiểm tra xem bài viết có khóa comment hay không (LOCKED)
+        - Định vị ô comment (lexical editor, contenteditable textbox)
+        - Gõ nội dung bình luận mô phỏng người thật
+        - Đính kèm ảnh nếu có image_path hợp lệ
+        - Gửi bình luận (Enter)
+        - Kiểm tra xác nhận đã gửi hoặc bị Facebook chặn thao tác (RESTRICTED)
+        Trả về: {"success": bool, "status": str, "error": Optional[str]}
+        """
+        if page is None:
+            seeding_logger.info("ℹ️ [MOCK/TEST]: Trình duyệt không có page thật, đánh dấu bình luận hoàn tất (DRAFT).")
+            return {"success": True, "status": "DRAFT", "error": None}
+
+        try:
+            seeding_logger.info(f"🚀 [GỬI BÌNH LUẬN]: Đang điều hướng tới bài viết: {post_url}...")
+            # Chỉ goto nếu URL hiện tại khác post_url
+            if post_url and post_url != page.url and "facebook.com" in post_url:
+                page.goto(post_url, timeout=30000, wait_until="domcontentloaded")
+                page.wait_for_timeout(3000)
+
+            # 1. Kiểm tra bài viết bị khóa comment hoặc tài khoản bị hạn chế
+            body_text = ""
+            try:
+                body_text = page.locator("body").inner_text().lower()
+            except Exception:
+                pass
+
+            locked_signals = [
+                "bình luận đã bị tắt", "comments have been turned off",
+                "tính năng bình luận đã bị tắt", "đã tắt tính năng bình luận",
+                "khóa tính năng bình luận", "tính năng này tạm thời bị khóa",
+                "bạn tạm thời bị hạn chế", "bình luận bị hạn chế"
+            ]
+            for sig in locked_signals:
+                if sig in body_text:
+                    seeding_logger.warning(f"⚠️ [BỊ KHÓA BÌNH LUẬN]: Bài viết hoặc tài khoản bị hạn chế comment: '{sig}'")
+                    return {"success": False, "status": "LOCKED", "error": f"Comment locked: {sig}"}
+
+            # 2. Tìm ô nhập comment Facebook
+            comment_selectors = [
+                "div[role='textbox'][aria-label*='Viết bình luận']",
+                "div[role='textbox'][aria-label*='Write a comment']",
+                "div[role='textbox'][aria-label*='Bình luận dưới tên']",
+                "div[role='textbox'][aria-label*='Comment as']",
+                "div[role='textbox'][contenteditable='true']",
+                "div[data-lexical-editor='true']",
+                "div[role='textbox']"
+            ]
+
+            input_box = None
+            for sel in comment_selectors:
+                loc = page.locator(sel).first
+                try:
+                    if loc.is_visible(timeout=1500):
+                        input_box = loc
+                        break
+                except Exception:
+                    continue
+
+            # Nếu chưa thấy ô nhập, thử bấm nút "Bình luận" (Comment button)
+            if not input_box:
+                seeding_logger.info("   🔍 Chưa thấy ô comment mở sẵn, tìm nút 'Bình luận' để kích hoạt...")
+                comment_btn_selectors = [
+                    "div[role='button']:has-text('Bình luận')",
+                    "div[role='button']:has-text('Comment')",
+                    "div[aria-label*='Bình luận'][role='button']",
+                    "div[aria-label*='Comment'][role='button']"
+                ]
+                for btn_sel in comment_btn_selectors:
+                    btn = page.locator(btn_sel).first
+                    try:
+                        if btn.is_visible(timeout=1500):
+                            btn.click()
+                            page.wait_for_timeout(1500)
+                            break
+                    except Exception:
+                        continue
+
+                # Tìm lại ô comment sau khi click
+                for sel in comment_selectors:
+                    loc = page.locator(sel).first
+                    try:
+                        if loc.is_visible(timeout=2000):
+                            input_box = loc
+                            break
+                    except Exception:
+                        continue
+
+            if not input_box:
+                seeding_logger.warning("⚠️ [KHÔNG TÌM THẤY Ô COMMENT]: Không định vị được ô nhập bình luận trên bài viết này.")
+                return {"success": False, "status": "FAILED", "error": "Comment input box not found"}
+
+            # 3. Focus và gõ nội dung mô phỏng
+            input_box.scroll_into_view_if_needed()
+            input_box.click()
+            page.wait_for_timeout(random.randint(600, 1000))
+
+            seeding_logger.info("   ✍️ Đang nhập nội dung bình luận review...")
+            try:
+                page.keyboard.insert_text(comment_text)
+            except Exception:
+                input_box.fill(comment_text)
+            page.wait_for_timeout(random.randint(800, 1500))
+
+            # 4. Đính kèm ảnh sản phẩm (nếu có và file tồn tại)
+            if image_path and os.path.exists(image_path):
+                seeding_logger.info(f"   🖼️ Đang thử đính kèm ảnh sản phẩm ({os.path.basename(image_path)})...")
+                try:
+                    file_input = page.locator("input[type='file'][accept*='image']").first
+                    if file_input.count() > 0:
+                        file_input.set_input_files(image_path)
+                        page.wait_for_timeout(2500)
+                except Exception as ex:
+                    seeding_logger.warning(f"   ⚠️ Không thể đính kèm ảnh vào comment: {ex} (Vẫn tiếp tục gửi text)")
+
+            # 5. Gửi bình luận (Nhấn Enter)
+            seeding_logger.info("   📤 Đang gửi bình luận (Press Enter)...")
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(3500)
+
+            # 6. Kiểm tra cảnh báo spam từ Facebook
+            try:
+                alert_text = page.locator("div[role='dialog'], div[role='alertdialog']").inner_text().lower()
+                if "thao tác quá nhanh" in alert_text or "tạm thời bị chặn" in alert_text or "spam" in alert_text:
+                    seeding_logger.error(f"❌ [CẢNH BÁO SPAM FACEBOOK]: Facebook phát hiện thao tác nhanh: {alert_text[:100]}")
+                    return {"success": False, "status": "RESTRICTED", "error": "Action restricted by Facebook"}
+            except Exception:
+                pass
+
+            seeding_logger.info("✅ [GỬI THÀNH CÔNG]: Bình luận seeding đã được đăng lên bài viết!")
+            return {"success": True, "status": "SUBMITTED", "error": None}
+
+        except Exception as e:
+            seeding_logger.error(f"❌ [LỖI GỬI COMMENT]: {e}", exc_info=True)
+            return {"success": False, "status": "FAILED", "error": str(e)}
 
     def scan_group_for_real_posts(self, page, group_url: str, group_name: str = "") -> List[Dict]:
         """Dùng Playwright quét các bài đăng thực tế trên bảng tin nhóm Facebook"""
@@ -373,6 +510,14 @@ class FacebookGroupSeeder:
                     group_url = g.get("url", "") or f"https://facebook.com/groups/{group_id}"
                     cat_name = g.get("category_name", "")
 
+                    # Kiểm tra rate limit nhóm trước khi quét
+                    if not self.can_seed_group(group_id, max_per_day=2):
+                        seeding_logger.info(
+                            f"⏳ [GIỚI HẠN NHÓM]: Nhóm [{group_name}] đã đạt giới hạn 2 bình luận hôm nay. "
+                            f"Bỏ qua để đảm bảo an toàn tuyệt đối cho tài khoản."
+                        )
+                        continue
+
                     seeding_logger.info(f"\n──────────────────────────────────────────────────────────────────────")
                     seeding_logger.info(f"👥 BẮT ĐẦU QUÉT NHÓM: [{group_name}]")
                     seeding_logger.info(f"   • Ngành hàng: [{cat_name}] | Link nhóm: {group_url}")
@@ -384,6 +529,10 @@ class FacebookGroupSeeder:
 
                     # Nếu tìm thấy bài viết thật có nhu cầu xin link
                     for p_idx, post in enumerate(real_posts[:2], 1):
+                        if not self.can_seed_group(group_id, max_per_day=2):
+                            seeding_logger.info(f"⏳ Nhóm [{group_name}] đã đủ 2 bình luận hôm nay, dừng gieo thêm vào nhóm này.")
+                            break
+
                         matched_deal = self.find_best_matching_deal(post["text"], category_name=cat_name)
                         if matched_deal:
                             comment = self.generate_seeding_comment(matched_deal, group_id, post_context=post["text"])
@@ -392,7 +541,7 @@ class FacebookGroupSeeder:
                             product_img_path = ImageBannerStamper.stamp_deal_image(matched_deal)
                             img_path_str = str(product_img_path) if product_img_path and product_img_path.exists() else ""
 
-                            # Lưu vào CSDL với link bài viết thật
+                            # 1. Ghi nhận bản ghi DRAFT ban đầu
                             self.db.log_comment_seeding(
                                 group_id=group_id,
                                 item_id=str(matched_deal["item_id"]),
@@ -412,20 +561,39 @@ class FacebookGroupSeeder:
                                 status="DRAFT"
                             )
 
+                            # 2. Thực hiện submit bình luận thực tế bằng Playwright
+                            submit_res = self.submit_comment(page, target_url, comment, image_path=img_path_str)
+                            final_status = submit_res.get("status", "DRAFT")
+
+                            # Cập nhật trạng thái sau khi gửi
+                            self.db.update_comment_seeding_status(
+                                group_id=group_id,
+                                item_id=str(matched_deal["item_id"]),
+                                target_post_url=target_url,
+                                status=final_status
+                            )
+
                             results.append({
                                 "group_name": group_name,
                                 "group_id": group_id,
                                 "target_url": target_url,
                                 "deal_name": matched_deal["name"],
-                                "comment": comment
+                                "comment": comment,
+                                "status": final_status
                             })
 
                             seeding_logger.info(
-                                f"   ✨ [ĐÃ SOẠN BÌNH LUẬN THẬT]: Khớp deal [{matched_deal['name'][:35]}]\n"
+                                f"   ✨ [BÌNH LUẬN SEEDING]: Khớp deal [{matched_deal['name'][:35]}]\n"
                                 f"      • Bài viết đích: {target_url}\n"
                                 f"      • Nội dung review: \"{comment[:140]}...\"\n"
-                                f"      • Đã lưu vào hàng đợi bình luận (Trạng thái: DRAFT - Sẵn sàng gửi)."
+                                f"      • Trạng thái gửi: {final_status}"
                             )
+
+                            # 3. Giãn cách an toàn nếu đang chạy trình duyệt thật
+                            if page is not None and final_status == "SUBMITTED":
+                                delay_sec = int(os.getenv("SEEDING_DELAY_SECONDS", str(random.randint(120, 240))))
+                                seeding_logger.info(f"⏳ Giãn cách an toàn {delay_sec}s trước bình luận tiếp theo...")
+                                time.sleep(delay_sec)
 
                 if browser:
                     browser.close()

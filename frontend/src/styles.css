@@ -82,3 +82,16 @@ body {
 .glass-card:hover {
   border-color: rgba(255, 255, 255, 0.14);
 }
+
+/* Global Floating Toast Container Protection */
+.toast-popup-container,
+.toast-popup {
+  position: fixed !important;
+  top: 24px !important;
+  right: 24px !important;
+  z-index: 999999 !important;
+  max-width: 500px !important;
+  width: calc(100vw - 48px) !important;
+  pointer-events: none !important;
+}
+

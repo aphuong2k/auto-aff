@@ -6,6 +6,7 @@ from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 from modules.affiliate.content_writer import DealContentWriter
 from modules.affiliate.image_stamper import ImageBannerStamper
 from database.db_manager import DatabaseManager
+from modules.common.resilience import telegram_circuit_breaker, CircuitBreakerOpenException
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -188,3 +189,34 @@ class TelegramPublisher:
         except Exception as e:
             logging.warning(f"Lỗi khi gửi bài nhắc sale tới Telegram: {e}")
             return False
+
+    def send_alert_message(self, text: str) -> bool:
+        """Gửi thông báo cảnh báo trực tiếp tới Telegram với bảo vệ Circuit Breaker"""
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", self.bot_token)
+        self.chat_id = os.getenv("TELEGRAM_CHAT_ID", self.chat_id)
+
+        if not self.bot_token or not self.chat_id:
+            logging.warning("Chưa cấu hình Telegram Bot Token hoặc Chat ID để gửi cảnh báo.")
+            return False
+
+        if not telegram_circuit_breaker.can_execute():
+            logging.warning("Telegram Circuit Breaker đang OPEN, tạm dừng gửi alert để tránh quá tải.")
+            return False
+
+        try:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                json={"chat_id": self.chat_id, "text": text, "parse_mode": "HTML"},
+                timeout=12
+            )
+            if resp.status_code == 200:
+                telegram_circuit_breaker.record_success()
+                return True
+            else:
+                telegram_circuit_breaker.record_failure()
+                return False
+        except Exception as e:
+            telegram_circuit_breaker.record_failure(e)
+            logging.warning(f"Lỗi gửi cảnh báo tới Telegram: {e}")
+            return False
+

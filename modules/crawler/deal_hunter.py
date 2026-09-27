@@ -407,7 +407,13 @@ class DealHunter:
                             "historical_sold": it.get("historical_sold", 0) or 0,
                             "is_mall": bool(it.get("is_shop_official", False)),
                             "is_preferred": bool(it.get("is_shop_preferred", False)),
-                            "deal_score": 95.0,
+                            "deal_score": round(min(
+                                ((int(round((1 - raw_price / raw_price_before) * 100)) if raw_price_before > raw_price else 0) * 0.4) +
+                                (round(it.get("item_rating", {}).get("rating_star", 5.0), 1) * 4.0) +
+                                min((it.get("historical_sold", 0) or 0) / 500.0, 15.0) +
+                                (5.0 if it.get("is_shop_official") else 0.0) + 10.0,
+                                92.0
+                            ), 1),
                             "price_badge": "LOSS_LEADER_1K",
                             "item_url": f"https://shopee.vn/product/{shopid}/{itemid}",
                             "image_url": f"https://down-vn.img.susercontent.com/file/{it.get('image')}" if it.get("image") else ""

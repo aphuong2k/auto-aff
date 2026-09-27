@@ -10,6 +10,7 @@ from config.settings import (
     MAX_JOIN_DELAY_SECONDS
 )
 from database.db_manager import DatabaseManager
+from modules.outreach.group_health_checker import GroupHealthChecker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -17,6 +18,7 @@ class FacebookAutoJoiner:
     """
     Module tự động tham gia Group Facebook THẬT bằng Playwright kèm AI trả lời câu hỏi duyệt nhóm.
     - Điều hướng trình duyệt tới URL của Group.
+    - Chấm điểm sức khỏe trước khi Join (Chống Group Ma bỏ hoang).
     - Tự động nhận diện và click nút 'Tham gia nhóm' / 'Join group'.
     - Tự động phát hiện form câu hỏi xét duyệt thành viên, dùng AI điền câu trả lời và check đồng ý quy tắc.
     - Cập nhật trạng thái PENDING hoặc APPROVED vào Database.
@@ -24,6 +26,7 @@ class FacebookAutoJoiner:
 
     def __init__(self, db: DatabaseManager = None):
         self.db = db or DatabaseManager()
+        self.health_checker = GroupHealthChecker(self.db)
 
     def answer_membership_questions_with_ai(self, questions: List[str]) -> List[str]:
         """Dùng AI/NLP để sinh câu trả lời tự nhiên cho các câu hỏi duyệt nhóm thật"""
@@ -120,6 +123,32 @@ class FacebookAutoJoiner:
                     if "Hủy yêu cầu" in body_text or "Cancel request" in body_text or "Đang chờ phê duyệt" in body_text:
                         logging.info(f"⏳ Yêu cầu tham gia nhóm [{group_name}] đang chờ duyệt. Cập nhật PENDING.")
                         self.db.update_group_status(group_id, "PENDING")
+                        continue
+
+                    # 0. Đánh giá sức khỏe bảng tin nhóm trước khi Join (Phát hiện Group Ma)
+                    health = self.health_checker.evaluate_page(page, group_url)
+                    last_active = None
+                    if health.get("last_post_hours_ago") is not None:
+                        from datetime import timedelta, datetime
+                        approx_active = datetime.now() - timedelta(hours=health["last_post_hours_ago"])
+                        last_active = approx_active.strftime("%Y-%m-%d %H:%M:%S")
+
+                    self.db.update_group_health(
+                        group_id=group_id,
+                        health_score=health["health_score"],
+                        avg_engagement=health.get("avg_engagement", 0.0),
+                        last_active_at=last_active,
+                        unique_posters=health.get("unique_posters", 0),
+                        health_verdict=health.get("verdict", "UNKNOWN")
+                    )
+
+                    if health["health_score"] < 30 or health.get("verdict") == "GHOST":
+                        logging.warning(
+                            f"🚫 [GROUP MA BỊ BỎ QUA]: Nhóm [{group_name}] có điểm sức khỏe quá thấp "
+                            f"({health['health_score']}/100, {health.get('verdict')}, bài mới nhất: {health.get('last_post_hours_ago')}h trước). "
+                            f"Hủy tham gia để bảo vệ tài khoản!"
+                        )
+                        self.db.update_group_status(group_id, "SKIPPED_GHOST")
                         continue
 
                     # Tìm kiếm nút 'Tham gia nhóm' / 'Join Group'
@@ -324,10 +353,13 @@ class FacebookAutoJoiner:
                 except Exception:
                     pass
 
-            if browser:
-                browser.close()
-            else:
-                context.close()
+            try:
+                if context:
+                    context.close()
+                if browser:
+                    browser.close()
+            except Exception:
+                pass
 
         logging.info(f"🎉 Hoàn thành đồng bộ: Đã cập nhật {len(joined_groups)} nhóm đã tham gia vào CSDL.")
         return joined_groups

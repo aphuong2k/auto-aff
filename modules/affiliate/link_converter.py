@@ -11,6 +11,7 @@ from config.settings import (
     SHOPEE_APP_ID, SHOPEE_SECRET, SHOPEE_AFF_COOKIE,
     REDIRECT_MODE, REDIRECT_BASE_URL
 )
+from modules.common.resilience import tinyurl_circuit_breaker, shopee_circuit_breaker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -348,14 +349,22 @@ class AffiliateLinkConverter:
             return long_url
         if long_url in cls._tinyurl_cache:
             return cls._tinyurl_cache[long_url]
+
+        if not tinyurl_circuit_breaker.can_execute():
+            return long_url
+
         try:
             api_url = f"https://tinyurl.com/api-create.php?url={urllib.parse.quote(long_url)}"
             resp = requests.get(api_url, timeout=5)
             if resp.status_code == 200 and resp.text.startswith("http"):
                 short_url = resp.text.strip()
                 cls._tinyurl_cache[long_url] = short_url
+                tinyurl_circuit_breaker.record_success()
                 return short_url
+            else:
+                tinyurl_circuit_breaker.record_failure()
         except Exception as e:
+            tinyurl_circuit_breaker.record_failure(e)
             logging.debug(f"Không thể rút gọn qua TinyURL, giữ nguyên link: {e}")
         return long_url
 

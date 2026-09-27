@@ -67,10 +67,10 @@ class TestMultiPlatformAffiliate(unittest.TestCase):
         self.db.save_deal(deal_lazada)
 
         # Query by platform
-        shopee_deals = self.db.get_deals(platform="SHOPEE")
+        shopee_deals = self.db.get_deals(limit=200, platform="SHOPEE")
         self.assertTrue(any(d["item_id"] == "test_shopee_001" for d in shopee_deals))
 
-        laz_deals = self.db.get_deals(platform="LAZADA")
+        laz_deals = self.db.get_deals(limit=200, platform="LAZADA")
         self.assertTrue(any(d["item_id"] == "test_laz_001" for d in laz_deals))
 
     def test_commission_tracker(self):
