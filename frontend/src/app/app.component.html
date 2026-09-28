@@ -471,7 +471,10 @@
             <button class="group-tab-btn" [class.active]="dealFreshnessFilter === 'STALE'" (click)="setDealFreshnessFilter('STALE')">⚠️ Hết hàng/hạn</button>
           </div>
 
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button class="btn-action-green" [disabled]="auditingDeals" (click)="auditAndCleanDeals()" title="Quét lọc và xóa bớt deal lỗi, hết hàng, giá ảo, đồng thời chuẩn hóa lại đúng ngành hàng cho toàn bộ sản phẩm" style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(234, 88, 12, 0.25), rgba(249, 115, 22, 0.35)); border: 1px solid rgba(249, 115, 22, 0.5); color: #fed7aa; font-weight: 700;">
+              <span>{{ auditingDeals ? '⏳ Đang quét lọc & chuẩn hóa...' : '🧹 Quét Lọc & Phân Loại Sản Phẩm' }}</span>
+            </button>
             <button class="btn-action-green" [disabled]="verifyingAllDeals" (click)="verifyAllDealsFreshness()" style="padding: 8px 14px; font-size: 0.82rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span>{{ verifyingAllDeals ? '⏳ Đang quét...' : '🔍 Quét Độ Tươi Toàn Bộ' }}</span>
             </button>
@@ -1991,11 +1994,65 @@
           </div>
         </div>
 
+        <!-- Facebook Account Selector Panel -->
+        <div class="glass-card" style="margin-bottom: 16px; padding: 16px 20px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.35rem; filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));">👤</span>
+              <div>
+                <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 700;">
+                  Nick Facebook Thực Thi:
+                </div>
+                <div style="font-size: 0.82rem; color: #cbd5e1;">
+                  Được dùng cố định cho mọi tác vụ Quét, Lọc, Duyệt bài & Đăng nhóm
+                </div>
+              </div>
+            </div>
+
+            <!-- Custom Account Select Dropdown -->
+            <div style="position: relative; display: inline-flex; align-items: center;">
+              <select [(ngModel)]="selectedFbAccountId" (change)="onFbAccountChange()" style="background: #0f172a; border: 1.5px solid #38bdf8; color: #f8fafc; font-weight: 700; font-size: 0.92rem; padding: 8px 36px 8px 14px; border-radius: 8px; cursor: pointer; outline: none; box-shadow: 0 0 14px rgba(56, 189, 248, 0.2); appearance: none;">
+                <option value="">🔄 Tự động luân phiên (Tất cả nick active)</option>
+                <option *ngFor="let acc of fbAccounts" [value]="acc.id">
+                  {{ acc.name }} — {{ acc.status === 'ACTIVE' ? '🟢 Sẵn sàng' : '⚠️ ' + acc.status }} (Đã đăng {{ acc.posts_today }}/{{ acc.daily_post_limit }})
+                </option>
+              </select>
+              <span style="position: absolute; right: 12px; pointer-events: none; color: #38bdf8; font-size: 0.8rem;">▼</span>
+            </div>
+
+            <!-- Active Selected Account Pill -->
+            <div *ngIf="getSelectedFbAccount() as curAcc" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); padding: 6px 14px; border-radius: 20px; font-size: 0.84rem;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
+              <strong style="color: #38bdf8;">{{ curAcc.name }}</strong>
+              <span style="color: #94a3b8;">| Đăng hôm nay: <strong style="color: #f1f5f9;">{{ curAcc.posts_today }}/{{ curAcc.daily_post_limit }}</strong> bài</span>
+              <button class="btn-table-link" (click)="testFbAccount(curAcc)" [disabled]="testingFbAccount[curAcc.id]" style="font-size: 0.78rem; padding: 2px 8px; background: rgba(56, 189, 248, 0.2); border-radius: 4px; color: #7dd3fc; margin-left: 4px;">
+                {{ testingFbAccount[curAcc.id] ? '⏳ Đang test...' : '⚡ Test Nick' }}
+              </button>
+            </div>
+
+            <div *ngIf="!selectedFbAccountId" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); padding: 6px 12px; border-radius: 20px; font-size: 0.82rem; color: #d8b4fe;">
+              <span>🔄 Chế độ xoay vòng: Tự động đổi nick sau mỗi lượt</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn-primary" (click)="showAddFbAccountModal = true" style="font-size: 0.82rem; padding: 7px 14px; display: inline-flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; box-shadow: none;">
+              <span>➕ Thêm Nick FB Mới</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Action Toolbar Card -->
         <div class="glass-card" style="margin-bottom: 24px; padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
             <button class="btn-sync-groups" [disabled]="syncingGroups" (click)="syncJoinedGroups()">
               <span>{{ syncingGroups ? '⏳ Đang quét Facebook...' : '🔄 Đồng Bộ Nhóm Đã Tham Gia Từ Facebook' }}</span>
+            </button>
+            <button class="btn-audit-groups" [disabled]="auditingGroups" (click)="auditAndCleanGroups()" title="Chấm điểm sức khỏe (loại trừ Group ma, đóng băng, vi phạm), tự động phân loại lại chuẩn ngành hàng">
+              <span>{{ auditingGroups ? '⏳ Đang quét & lọc...' : '🛡️ Quét Lọc Sức Khỏe & Phân Loại Group' }}</span>
+            </button>
+            <button class="btn-audit-groups" (click)="checkPendingApprovals()" title="Rà soát các bài đã đăng, tự động out group nếu bị chờ duyệt hoặc từ chối >= 2 lần" style="background: rgba(234, 88, 12, 0.15); border: 1px solid rgba(234, 88, 12, 0.35); color: #fb923c;">
+              <span>🔎 Check Duyệt Bài & Auto-Out</span>
             </button>
             <button class="btn-primary" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 8px 16px;" (click)="openAddGroupModal()">
               <span>➕ Thêm Nhóm Thủ Công</span>
@@ -2068,6 +2125,13 @@
                 <span>⏱️ Nhịp nghỉ giữa các bài:</span>
                 <input type="number" min="5" max="600" [(ngModel)]="gradualDelaySeconds" style="width: 60px; padding: 3px 6px; background: #0f172a; border: 1px solid #f97316; border-radius: 6px; color: #fff; font-weight: 700; text-align: center;">
                 <span>giây</span>
+              </div>
+              <div *ngIf="getSelectedFbAccount() as curAcc" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; background: rgba(0,0,0,0.35); padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <span>👤 Đăng bằng:</span>
+                <strong style="color: #38bdf8;">{{ curAcc.name }}</strong>
+              </div>
+              <div *ngIf="!selectedFbAccountId" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; background: rgba(0,0,0,0.35); padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(168, 85, 247, 0.3);">
+                <span>🔄 Xoay vòng nick</span>
               </div>
             </div>
 
@@ -2236,6 +2300,9 @@
               <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                 <button class="btn-sync-groups" [disabled]="syncingGroups" (click)="syncJoinedGroups()">
                   <span>{{ syncingGroups ? '⏳ Đang quét Facebook...' : '🔄 Đồng Bộ Nhóm Từ Facebook' }}</span>
+                </button>
+                <button class="btn-audit-groups" [disabled]="auditingGroups" (click)="auditAndCleanGroups()">
+                  <span>{{ auditingGroups ? '⏳ Đang quét & lọc...' : '🛡️ Quét Lọc Sức Khỏe & Phân Loại' }}</span>
                 </button>
                 <button class="btn-primary" (click)="openAddGroupModal()">
                   <span>➕ Thêm Nhóm Bằng Link</span>

@@ -165,3 +165,60 @@ class FacebookAccountManager:
 
 # Backward-compatible alias
 FbAccountManager = FacebookAccountManager
+
+
+def resolve_fb_account(
+    db_manager,
+    account_id: Optional[object] = None,
+    allow_rotation: bool = False,
+    task_type: str = "POST"
+) -> Tuple[Optional[Dict], str, str]:
+    """
+    Xác định tài khoản Facebook cần dùng cho mọi tác vụ (quét, tham gia, kiểm tra, đăng bài):
+    - Nếu account_id được truyền (int, chuỗi số):
+        -> Lấy chính xác tài khoản db.get_fb_account_by_id(int(account_id)).
+        -> KHÔNG TỰ ĐỘNG CHUYỂN SANG NICK KHÁC!
+    - Nếu account_id == 'rotate' hoặc (account_id is None and allow_rotation is True):
+        -> Dùng AccountManager để luân phiên (Round-Robin).
+    - Nếu account_id is None and allow_rotation is False:
+        -> Lấy tài khoản đang active đầu tiên trong bảng fb_accounts.
+        -> Nếu không có tài khoản nào trong DB: fallback sang cấu hình trong .env (FB_COOKIE, FB_CHROME_PROFILE).
+        -> KHÔNG TỰ ĐỘNG CHUYỂN NICK.
+    Trả về: (account_dict, cookie, profile_path)
+    """
+    mgr = FacebookAccountManager(db_manager)
+    mgr.sync_from_env_if_empty()
+
+    # 1. Người dùng chỉ định rõ tài khoản (bằng ID)
+    if account_id is not None and str(account_id).strip() != "" and str(account_id).strip().lower() != "rotate":
+        try:
+            aid = int(account_id)
+            acc = db_manager.get_fb_account_by_id(aid)
+            if acc:
+                cookie = (acc.get("cookie") or "").strip()
+                profile_path = (acc.get("profile_path") or "").strip()
+                return acc, cookie, profile_path
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Yêu cầu luân phiên tự động
+    if str(account_id).strip().lower() == "rotate" or (account_id is None and allow_rotation):
+        acc, _ = mgr.get_next_account(task_type=task_type)
+        if acc:
+            cookie = (acc.get("cookie") or "").strip()
+            profile_path = (acc.get("profile_path") or "").strip()
+            return acc, cookie, profile_path
+
+    # 3. Mặc định: Giữ nguyên tài khoản active đầu tiên - KHÔNG TỰ Ý ĐỔI NICK
+    active_accounts = db_manager.get_fb_accounts(only_active=True)
+    if active_accounts:
+        acc = active_accounts[0]
+        cookie = (acc.get("cookie") or "").strip()
+        profile_path = (acc.get("profile_path") or "").strip()
+        return acc, cookie, profile_path
+
+    # 4. Fallback .env
+    env_cookie = os.getenv("FB_COOKIE", "").strip()
+    env_profile = os.getenv("FB_CHROME_PROFILE", "").strip()
+    return None, env_cookie, env_profile
+

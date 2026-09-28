@@ -33,7 +33,7 @@ class JoinFeedbackMonitor:
     def __init__(self, db: Optional[DatabaseManager] = None):
         self.db = db or DatabaseManager()
 
-    def check_pending_joins(self) -> Dict:
+    def check_pending_joins(self, account_id: Optional[object] = None) -> Dict:
         """
         Quét toàn bộ danh sách group có status='PENDING' trong CSDL.
         Dùng Playwright kiểm tra tình trạng duyệt và xử lý auto-leave nếu quá hạn.
@@ -43,10 +43,10 @@ class JoinFeedbackMonitor:
             monitor_logger.info("Không có nhóm nào đang ở trạng thái PENDING chờ kiểm tra.")
             return {"total": 0, "approved": 0, "still_pending": 0, "rejected": 0, "left": 0}
 
-        monitor_logger.info(f"📋 Bắt đầu kiểm tra {len(pending_groups)} nhóm đang chờ duyệt...")
-
-        fb_cookie = os.getenv("FB_COOKIE", "")
-        fb_profile = os.getenv("FB_CHROME_PROFILE", "")
+        from modules.outreach.fb_account_manager import resolve_fb_account
+        acc, fb_cookie, fb_profile = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
+        acc_name = acc.get("name") if acc else "Nick Facebook"
+        monitor_logger.info(f"📋 Bắt đầu kiểm tra {len(pending_groups)} nhóm đang chờ duyệt bằng tài khoản [{acc_name}]...")
 
         if not fb_cookie and not fb_profile:
             raise RuntimeError("Chưa cấu hình tài khoản Facebook (Cookie hoặc Chrome Profile) để kiểm tra!")
@@ -214,12 +214,45 @@ class JoinFeedbackMonitor:
             monitor_logger.debug(f"Lỗi khi bấm hủy yêu cầu: {e}")
         return False
 
-    def leave_group(self, group_url: str) -> bool:
+    def leave_group_on_page(self, page) -> bool:
+        """Thực hiện click rời nhóm trực tiếp trên trang Playwright đang mở."""
+        try:
+            # 1. Tìm nút 'Đã tham gia' / 'Joined'
+            joined_btn = page.locator("div[aria-label='Đã tham gia'], div[aria-label='Joined'], div[role='button']:has-text('Đã tham gia'), div[role='button']:has-text('Joined')").first
+            if joined_btn.is_visible(timeout=2000):
+                joined_btn.click()
+                page.wait_for_timeout(1000)
+
+                # Chọn mục 'Rời nhóm' / 'Leave group' trong menu
+                leave_menu_item = page.locator("div[role='menuitem']:has-text('Rời khỏi nhóm'), div[role='menuitem']:has-text('Rời nhóm'), div[role='menuitem']:has-text('Leave group')").first
+                if leave_menu_item.is_visible(timeout=2000):
+                    leave_menu_item.click()
+                    page.wait_for_timeout(1000)
+
+                    # Xác nhận dialog rời nhóm
+                    confirm_dialog_btn = page.locator("div[role='dialog'] div[role='button']:has-text('Rời khỏi nhóm'), div[role='dialog'] div[role='button']:has-text('Rời nhóm'), div[role='dialog'] div[role='button']:has-text('Leave group')").first
+                    if confirm_dialog_btn.is_visible(timeout=2000):
+                        confirm_dialog_btn.click()
+                        page.wait_for_timeout(2000)
+                        return True
+
+            # Hoặc nếu là nút Hủy yêu cầu đang chờ
+            if self.cancel_pending_request(page):
+                return True
+        except Exception as e:
+            monitor_logger.error(f"Lỗi khi thao tác rời nhóm trên page: {e}")
+        return False
+
+    def leave_group(self, group_url: str, page=None, account_id: Optional[object] = None) -> bool:
         """
         Rời khỏi nhóm Facebook đã tham gia (Áp dụng khi nhóm thành group ma hoặc liên tục bị từ chối bài).
+        Nếu page đã mở sẵn thì tái sử dụng trực tiếp để tránh xung đột Chrome Profile.
         """
-        fb_cookie = os.getenv("FB_COOKIE", "")
-        fb_profile = os.getenv("FB_CHROME_PROFILE", "")
+        if page is not None:
+            return self.leave_group_on_page(page)
+
+        from modules.outreach.fb_account_manager import resolve_fb_account
+        acc, fb_cookie, fb_profile = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
 
         if not fb_cookie and not fb_profile:
             raise RuntimeError("Chưa cấu hình thông tin đăng nhập Facebook!")
@@ -255,39 +288,16 @@ class JoinFeedbackMonitor:
                     if cookie_list:
                         context.add_cookies(cookie_list)
 
-            page = context.new_page()
+            page_inst = context.new_page()
 
             try:
-                page.goto(group_url, timeout=35000, wait_until="domcontentloaded")
-                page.wait_for_timeout(3000)
-
-                # 1. Tìm nút 'Đã tham gia' / 'Joined'
-                joined_btn = page.locator("div[aria-label='Đã tham gia'], div[aria-label='Joined'], div[role='button']:has-text('Đã tham gia')").first
-                if joined_btn.is_visible(timeout=2000):
-                    joined_btn.click()
-                    page.wait_for_timeout(1000)
-
-                    # Chọn mục 'Rời nhóm' / 'Leave group' trong menu
-                    leave_menu_item = page.locator("div[role='menuitem']:has-text('Rời khỏi nhóm'), div[role='menuitem']:has-text('Rời nhóm'), div[role='menuitem']:has-text('Leave group')").first
-                    if leave_menu_item.is_visible(timeout=2000):
-                        leave_menu_item.click()
-                        page.wait_for_timeout(1000)
-
-                        # Xác nhận dialog rời nhóm
-                        confirm_dialog_btn = page.locator("div[role='dialog'] div[role='button']:has-text('Rời khỏi nhóm'), div[role='dialog'] div[role='button']:has-text('Rời nhóm'), div[role='dialog'] div[role='button']:has-text('Leave group')").first
-                        if confirm_dialog_btn.is_visible(timeout=2000):
-                            confirm_dialog_btn.click()
-                            page.wait_for_timeout(2000)
-                            success = True
-                            monitor_logger.info(f"🚪 Đã rời nhóm thành công: {group_url}")
-
-                # Hoặc nếu là nút Hủy yêu cầu đang chờ
-                if not success and self.cancel_pending_request(page):
-                    success = True
-                    monitor_logger.info(f"🚪 Đã hủy yêu cầu tham gia thành công: {group_url}")
-
+                page_inst.goto(group_url, timeout=35000, wait_until="domcontentloaded")
+                page_inst.wait_for_timeout(3000)
+                success = self.leave_group_on_page(page_inst)
+                if success:
+                    monitor_logger.info(f"🚪 Đã rời nhóm thành công: {group_url}")
             except Exception as e:
-                monitor_logger.error(f"Lỗi khi rời nhóm {group_url}: {e}")
+                monitor_logger.error(f"Lỗi khi mở và rời nhóm {group_url}: {e}")
 
             if browser:
                 browser.close()

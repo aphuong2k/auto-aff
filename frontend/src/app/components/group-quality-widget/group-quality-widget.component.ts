@@ -51,7 +51,7 @@ import { ToastService } from '../../services/toast.service';
         <div class="metric-card restricted">
           <div class="metric-badge">🚫 BỊ HẠN CHẾ</div>
           <div class="metric-value">{{ metrics?.restricted_count || 0 }}</div>
-          <div class="metric-desc">Bị Admin từ chối bài liên tiếp &gt;= 3 lần</div>
+          <div class="metric-desc">Bị chờ duyệt/từ chối &gt;= 2 lần (Auto-Out)</div>
         </div>
       </div>
     </div>

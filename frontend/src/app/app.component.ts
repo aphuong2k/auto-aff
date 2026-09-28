@@ -409,6 +409,8 @@ export class AppComponent implements OnInit, OnDestroy {
   groups: FbGroup[] = [];
   groupsFilterTab: 'ALL' | 'APPROVED' | 'DISCOVERED' | 'PENDING' | 'HEALTHY' | 'GHOST' = 'ALL';
   syncingGroups = false;
+  auditingGroups = false;
+  auditingDeals = false;
   showAddGroupModal = false;
   newGroup = {
     url: '',
@@ -458,7 +460,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   checkSingleGroupHealth(g: FbGroup): void {
     this.toast.info(`Đang kiểm tra chất lượng & tương tác nhóm [${g.name}]...`);
-    this.api.checkGroupHealth(g.url).subscribe({
+    this.api.checkGroupHealth(g.url, this.getEffectiveAccountId()).subscribe({
       next: (res) => {
         g.health_score = res.health_score;
         g.health_verdict = res.verdict;
@@ -472,7 +474,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   checkSinglePending(g: FbGroup): void {
     this.toast.info(`Đang kiểm tra phê duyệt tham gia nhóm [${g.name}]...`);
-    this.api.checkPendingJoin(g.url).subscribe({
+    this.api.checkPendingJoin(g.url, this.getEffectiveAccountId()).subscribe({
       next: (res) => {
         if (res.approved) {
           g.status = 'APPROVED';
@@ -496,13 +498,28 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     this.toast.info(`Đang tiến hành rời khỏi nhóm [${g.name}]...`);
-    this.api.leaveFbGroup(g.url).subscribe({
+    this.api.leaveFbGroup(g.url, this.getEffectiveAccountId()).subscribe({
       next: (res) => {
         this.toast.success(`Đã rời nhóm [${g.name}] thành công.`);
         this.fetchGroups();
       },
       error: (err) => {
         this.toast.error(`Lỗi khi rời nhóm: ` + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  checkPendingApprovals(): void {
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` bằng [${curAcc.name}]` : '';
+    this.toast.info(`Đang rà soát trạng thái duyệt bài viết trên các nhóm Facebook${accLabel}...`);
+    this.api.checkPendingApprovals(this.getEffectiveAccountId()).subscribe({
+      next: (res) => {
+        this.toast.success(res.message || 'Đã kiểm tra xong duyệt bài viết!');
+        this.fetchGroups();
+      },
+      error: (err) => {
+        this.toast.error('Lỗi kiểm tra duyệt bài: ' + (err.error?.detail || err.message));
       }
     });
   }
@@ -604,8 +621,9 @@ export class AppComponent implements OnInit, OnDestroy {
   testingTelegram = false;
   testingLazada = false;
 
-  // Facebook Multi-Account Rotation State
+  // Facebook Multi-Account Rotation & Selector State
   fbAccounts: any[] = [];
+  selectedFbAccountId: number | string = '';
   loadingFbAccounts = false;
   showAddFbAccountModal = false;
   newFbAccount = {
@@ -645,6 +663,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.fetchStats();
     this.fetchHealth();
     this.fetchSchedule();
+    this.fetchFbAccounts();
 
     // 2. Tải dữ liệu tương ứng tab khởi đầu (Lazy loading)
     this.switchTab(this.activeTab);
@@ -1474,9 +1493,15 @@ export class AppComponent implements OnInit, OnDestroy {
     const gid = group.group_id;
     this.closePickDealModal();
     this.postingSingleGroup[gid] = true;
-    this.triggerToast(`Đang đăng sản phẩm [${deal.name}] vào nhóm [${group.name}]...`, 'info');
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` (bằng ${curAcc.name})` : '';
+    this.triggerToast(`Đang đăng sản phẩm [${deal.name}] vào nhóm [${group.name}]${accLabel}...`, 'info');
 
-    this.http.post<any>(`${this.apiUrl}/outreach/post-to-group`, { group_id: gid, deal_id: deal.item_id }).subscribe({
+    this.http.post<any>(`${this.apiUrl}/outreach/post-to-group`, {
+      group_id: gid,
+      deal_id: deal.item_id,
+      account_id: this.getEffectiveAccountId()
+    }).subscribe({
       next: (res) => {
         this.postingSingleGroup[gid] = false;
         this.triggerToast(res.message || `Đã đăng bài thành công vào nhóm [${group.name}]!`, 'success');
@@ -1493,8 +1518,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   syncJoinedGroups(): void {
     this.syncingGroups = true;
-    this.triggerToast('Đang kết nối Facebook để quét danh sách nhóm đã tham gia...', 'info');
-    this.http.post<any>(`${this.apiUrl}/groups/sync-joined`, {}).subscribe({
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` bằng [${curAcc.name}]` : '';
+    this.triggerToast(`Đang kết nối Facebook để quét danh sách nhóm đã tham gia${accLabel}...`, 'info');
+    this.http.post<any>(`${this.apiUrl}/groups/sync-joined`, {
+      account_id: this.getEffectiveAccountId()
+    }).subscribe({
       next: (res) => {
         this.syncingGroups = false;
         this.triggerToast(res.message || 'Đồng bộ thành công nhóm Facebook!', 'success');
@@ -1505,6 +1534,29 @@ export class AppComponent implements OnInit, OnDestroy {
         this.syncingGroups = false;
         const msg = err.error?.detail || err.message || 'Lỗi khi đồng bộ';
         this.triggerToast('Lỗi đồng bộ nhóm: ' + msg, 'error');
+      }
+    });
+  }
+
+  auditAndCleanGroups(): void {
+    if (this.auditingGroups) return;
+    this.auditingGroups = true;
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` bằng [${curAcc.name}]` : '';
+    this.triggerToast(`Đang chấm điểm sức khỏe, lọc bỏ group ma và phân loại lại nhóm${accLabel}...`, 'info');
+    this.http.post<any>(`${this.apiUrl}/groups/audit-and-clean`, {
+      account_id: this.getEffectiveAccountId()
+    }).subscribe({
+      next: (res) => {
+        this.auditingGroups = false;
+        this.triggerToast(res.message || 'Đã quét và lọc nhóm thành công!', 'success');
+        this.fetchGroups();
+        this.fetchStats();
+      },
+      error: (err) => {
+        this.auditingGroups = false;
+        const msg = err.error?.detail || err.message || 'Lỗi khi quét & lọc nhóm';
+        this.triggerToast('Lỗi: ' + msg, 'error');
       }
     });
   }
@@ -1651,13 +1703,16 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const delay = this.gradualDelaySeconds || 60;
-    this.triggerToast(`Đang khởi động đăng bài tuần tự vào ${targetIds.length} nhóm (nhịp nghỉ ${delay}s giữa các bài)...`, 'info');
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` bằng [${curAcc.name}]` : '';
+    this.triggerToast(`Đang khởi động đăng bài tuần tự vào ${targetIds.length} nhóm (nhịp nghỉ ${delay}s giữa các bài)${accLabel}...`, 'info');
 
     this.http.post<any>(`${this.apiUrl}/outreach/start-gradual-posting`, {
       group_ids: targetIds,
       delay_seconds: delay,
       min_delay_seconds: delay,
-      max_delay_seconds: delay
+      max_delay_seconds: delay,
+      account_id: this.getEffectiveAccountId()
     }).subscribe({
       next: (res) => {
         this.triggerToast(res.message, 'success');
@@ -1669,12 +1724,15 @@ export class AppComponent implements OnInit, OnDestroy {
 
   startGradualPosting(): void {
     const delay = this.gradualDelaySeconds || 60;
-    this.triggerToast(`Đang khởi động tiến trình đăng bài dần vào ${this.gradualMaxGroups} nhóm...`, 'info');
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` bằng [${curAcc.name}]` : '';
+    this.triggerToast(`Đang khởi động tiến trình đăng bài dần vào ${this.gradualMaxGroups} nhóm${accLabel}...`, 'info');
     this.http.post<any>(`${this.apiUrl}/outreach/start-gradual-posting`, {
       max_groups: this.gradualMaxGroups,
       delay_seconds: delay,
       min_delay_seconds: delay,
-      max_delay_seconds: delay
+      max_delay_seconds: delay,
+      account_id: this.getEffectiveAccountId()
     }).subscribe({
       next: (res) => {
         this.triggerToast(res.message, 'success');
@@ -1697,9 +1755,14 @@ export class AppComponent implements OnInit, OnDestroy {
   postToSingleGroup(group: FbGroup): void {
     const gid = group.group_id;
     this.postingSingleGroup[gid] = true;
-    this.triggerToast(`Đang tìm deal phù hợp và đăng bài vào nhóm [${group.name}]...`, 'info');
+    const curAcc = this.getSelectedFbAccount();
+    const accLabel = curAcc ? ` (bằng ${curAcc.name})` : '';
+    this.triggerToast(`Đang tìm deal phù hợp và đăng bài vào nhóm [${group.name}]${accLabel}...`, 'info');
 
-    this.http.post<any>(`${this.apiUrl}/outreach/post-to-group`, { group_id: gid }).subscribe({
+    this.http.post<any>(`${this.apiUrl}/outreach/post-to-group`, {
+      group_id: gid,
+      account_id: this.getEffectiveAccountId()
+    }).subscribe({
       next: (res) => {
         this.postingSingleGroup[gid] = false;
         this.triggerToast(res.message || `Đã đăng bài thành công vào nhóm [${group.name}]!`, 'success');
@@ -2028,6 +2091,26 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  auditAndCleanDeals(): void {
+    if (this.auditingDeals) return;
+    this.auditingDeals = true;
+    this.triggerToast('Đang quét kho sản phẩm: xóa bớt deal lỗi/ôi thiu/bán ế & phân loại lại nhóm ngành...', 'info');
+    this.http.post<any>(`${this.apiUrl}/deals/audit-and-clean`, {}).subscribe({
+      next: (res) => {
+        this.auditingDeals = false;
+        this.triggerToast(res.message || 'Đã quét lọc và phân loại lại kho sản phẩm!', 'success');
+        this.fetchDeals();
+        this.fetchCategoryInventory();
+        this.fetchStats();
+      },
+      error: (err) => {
+        this.auditingDeals = false;
+        const msg = err.error?.detail || err.message || 'Lỗi khi quét & dọn dẹp sản phẩm';
+        this.triggerToast('Lỗi: ' + msg, 'error');
+      }
+    });
+  }
+
   testLazadaConnection(): void {
     this.testingLazada = true;
     this.http.post<any>(`${this.apiUrl}/test/lazada`, {}).subscribe({
@@ -2134,12 +2217,47 @@ export class AppComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.loadingFbAccounts = false;
         this.fbAccounts = res.accounts || [];
+        if (!this.selectedFbAccountId && this.fbAccounts.length > 0) {
+          const saved = localStorage.getItem('selectedFbAccountId');
+          const exists = this.fbAccounts.some(a => String(a.id) === String(saved));
+          if (saved && exists) {
+            this.selectedFbAccountId = saved;
+          } else {
+            const activeAcc = this.fbAccounts.find(a => a.is_active && a.status === 'ACTIVE') || this.fbAccounts[0];
+            if (activeAcc) {
+              this.selectedFbAccountId = activeAcc.id;
+              localStorage.setItem('selectedFbAccountId', String(activeAcc.id));
+            }
+          }
+        }
       },
       error: (err) => {
         this.loadingFbAccounts = false;
         console.error('Lỗi tải danh sách tài khoản FB:', err);
       }
     });
+  }
+
+  onFbAccountChange(): void {
+    if (this.selectedFbAccountId) {
+      localStorage.setItem('selectedFbAccountId', String(this.selectedFbAccountId));
+      const acc = this.getSelectedFbAccount();
+      if (acc) {
+        this.triggerToast(`Đã chọn tài khoản Facebook: [${acc.name}] cho mọi tác vụ!`, 'info');
+      }
+    } else {
+      localStorage.removeItem('selectedFbAccountId');
+      this.triggerToast('Đã chọn chế độ Tự động luân phiên (Auto-Rotate) cho các tài khoản Facebook.', 'info');
+    }
+  }
+
+  getSelectedFbAccount(): any {
+    if (!this.selectedFbAccountId) return null;
+    return this.fbAccounts.find(a => String(a.id) === String(this.selectedFbAccountId)) || null;
+  }
+
+  getEffectiveAccountId(): number | undefined {
+    return this.selectedFbAccountId ? Number(this.selectedFbAccountId) : undefined;
   }
 
   addFbAccount(): void {

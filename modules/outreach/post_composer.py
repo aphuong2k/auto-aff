@@ -101,8 +101,10 @@ class LinguisticPermutator:
     ADDRESSING = {
         "men": ["anh em", "mọi người", "cả nhà", "bác nào", "các bro", "mn"],
         "women": ["chị em", "các nàng", "cả nhà mình", "chị em mình", "mọi người", "mn"],
-        "tech": ["anh em", "mọi người", "bác nào", "cả nhà", "dân công nghệ", "mn"],
-        "beauty": ["chị em", "các nàng", "chị em mình", "mọi người", "mn"],
+        "tech": ["anh em", "mọi người", "bác nào", "cả nhà", "dân công nghệ", "mn", "các đồng bo"],
+        "beauty": ["chị em", "các nàng", "cả nhà mình", "hội mê skincare", "chị em mình", "mn"],
+        "home": ["cả nhà", "mọi người", "hội yêu bếp", "hội nghiện nhà", "các bác", "mn"],
+        "mom": ["các mom", "các mẹ", "mẹ bỉm", "hội mẹ bỉm", "mọi người", "mn"],
         "general": ["cả nhà", "mọi người", "anh em", "mn", "bác nào"]
     }
 
@@ -147,6 +149,9 @@ class PostComposer:
     Trình soạn thảo bài đăng Facebook & Telegram chuyên nghiệp:
     - Xoay vòng template (Template Rotation) tránh đăng lặp cấu trúc.
     - Cấu trúc câu động (Dynamic Sentence Assembly) kết hợp từ ngữ vùng miền.
+    - Đa dạng kịch bản: Review có tâm, Săn flash sale, So sánh hàng chợ vs Mall,
+      Pass deal gom chung, Hỏi ý kiến thảo luận, Giải pháp nỗi đau.
+    - Hỗ trợ chuyên sâu các ngành: Thời Trang Nam, Nữ, Công Nghệ, Gia Dụng, Mỹ Phẩm, Mẹ & Bé, Tổng Hợp.
     - Tự động kiểm tra trùng lặp qua ContentDeduplicator (ngưỡng 80%).
     """
 
@@ -175,14 +180,20 @@ class PostComposer:
     def _get_tpl_id(matched_cat: str, idx: int) -> str:
         if matched_cat == "Thời Trang Nam":
             return f"MEN_TPL_{idx}"
-        elif matched_cat in ("Thời Trang Nữ", "Sắc Đẹp"):
+        elif matched_cat == "Thời Trang Nữ":
             return f"WOMEN_TPL_{idx}"
+        elif matched_cat in ("Sắc Đẹp", "Mỹ Phẩm"):
+            return f"BEAUTY_TPL_{idx}"
+        elif matched_cat in ("Nhà Cửa & Đời Sống", "Thiết Bị Điện Gia Dụng"):
+            return f"HOME_TPL_{idx}"
+        elif matched_cat in ("Mẹ & Bé", "Mẹ và Bé"):
+            return f"BABY_TPL_{idx}"
         elif matched_cat == "Thiết Bị Điện Tử":
             return f"TECH_TPL_{idx}"
         return f"GEN_TPL_{idx}"
 
     def get_best_performing_template(self, category_prefix: str) -> Optional[int]:
-        """Lấy chỉ số template (1..4) có tỷ lệ click cao nhất trong quá khứ cho ngành hàng"""
+        """Lấy chỉ số template (1..6) có tỷ lệ click cao nhất trong quá khứ cho ngành hàng"""
         if not self.db:
             return None
         try:
@@ -204,9 +215,8 @@ class PostComposer:
             pass
         return None
 
-
     # =========================================================================
-    # DANH SÁCH TEMPLATE XOAY VÒNG THEO TỪNG DANH MỤC
+    # DANH SÁCH TEMPLATE XOAY VÒNG THEO TỪNG DANH MỤC & KỊCH BẢN ĐA DẠNG
     # =========================================================================
 
     def _render_fashion_men(self, deal: Dict, group: Dict, tracking_url: str, tpl_idx: int) -> Tuple[str, str]:
@@ -218,8 +228,8 @@ class PostComposer:
         discount = deal.get("discount_percent", 0)
         sold = deal.get("historical_sold", 0)
         rating = deal.get("rating_star", 5.0)
-
         tpl_id = f"MEN_TPL_{tpl_idx}"
+
         if tpl_idx == 1:
             content = (
                 f"Góc phối đồ & pass deal hời cho {addr} {p} 👇\n\n"
@@ -250,7 +260,7 @@ class PostComposer:
                 f"👉 Mua tại gian hàng Mall: {tracking_url}\n\n"
                 f"#menswear #dealshopee #thoitrang #giare"
             )
-        else:
+        elif tpl_idx == 4:
             content = (
                 f"Review nhanh cho {addr} con '{item_name}' cực đáng tiền trong tầm giá {p} ⚡\n\n"
                 f"• Giá sale cực sốc: {price_sale:,}đ (Tiết kiệm {price_orig - price_sale:,}đ)\n"
@@ -258,6 +268,27 @@ class PostComposer:
                 f"{addr} nhớ bỏ sẵn vào giỏ hàng rồi áp mã vận chuyển để được freeship tận nhà {p}.\n"
                 f"🔗 Link chính hãng đây {p}: {tracking_url}\n\n"
                 f"#thoitrangnam #dealngon #shopee"
+            )
+        elif tpl_idx == 5:
+            # Kịch bản so sánh hàng chợ vs hàng xịn Mall
+            content = (
+                f"Kinh nghiệm xương máu của em chia sẻ thật lòng cho {addr} {p} ⚠️\n\n"
+                f"Trước hay ham rẻ mua mấy món trôi nổi vài chục ngàn giặt đúng 1 nước là xù lông, bai dão form. "
+                f"Đợt này đổi sang em '{item_name}' bên shop Mall chính hãng mặc sướng hẳn, đường may kỹ càng.\n\n"
+                f"Nay lướt thấy Mall đang xả kho sale từ {price_orig:,}đ còn đúng {price_sale:,}đ (-{discount}%).\n"
+                f"Đã có {sold:,} anh em kiểm chứng {rating}⭐, bác nào cần đồ bền đẹp mặc lâu dài thì tranh thủ múc:\n"
+                f"👉 Link Mall chính hãng: {tracking_url}\n\n"
+                f"#kinhnghiemmuado #thoitrangnam #hangchinhhang #shopeemall"
+            )
+        else:
+            # Kịch bản hỏi ý kiến / thảo luận tương tác cao
+            content = (
+                f"Có bác nào trong nhóm mình đang dùng em '{item_name}' này chưa ạ? Cho em xin ít review thực tế với {p} 🤔\n\n"
+                f"Thấy đánh giá {rating} sao với hơn {sold:,} lượt bán khủng bên Shopee Mall. "
+                f"Nay đang có mã Flash Sale giảm sâu còn {price_sale:,}đ (gốc tận {price_orig:,}đ) nên em tính làm 1-2 cái.\n\n"
+                f"Bác nào cũng đang ngắm thì nghía chung deal này nhé:\n"
+                f"🔗 Link gian hàng Mall đây ạ: {tracking_url}\n\n"
+                f"#hoiykien #reviewthoitrang #gocmuasam #dealnam"
             )
         return content, tpl_id
 
@@ -270,8 +301,8 @@ class PostComposer:
         discount = deal.get("discount_percent", 0)
         sold = deal.get("historical_sold", 0)
         rating = deal.get("rating_star", 5.0)
-
         tpl_id = f"WOMEN_TPL_{tpl_idx}"
+
         if tpl_idx == 1:
             content = (
                 f"Góc làm đẹp & phối đồ xinh cho {addr} {p} 🥰\n\n"
@@ -300,13 +331,33 @@ class PostComposer:
                 f"👉 Xem chi tiết & đặt hàng: {tracking_url}\n\n"
                 f"#ootd #xinhdep #sansale #shopeefeed"
             )
-        else:
+        elif tpl_idx == 4:
             content = (
                 f"Deal hời cho {addr} tút tát phong cách đây {p} 🌸\n\n"
                 f"Mẫu '{item_name}' hot hit bên Shopee Mall đang sale còn {price_sale:,}đ (-{discount}%).\n"
                 f"Chất liệu xịn, lên dáng chuẩn, feedback {rating}⭐ hơn {sold:,} lượt mua.\n"
                 f"🔗 Link săn deal hời: {tracking_url}\n\n"
                 f"#thoitrangnu #doxinh #giamgia #shopee"
+            )
+        elif tpl_idx == 5:
+            # Kịch bản review thực tế sau 1 tháng trải nghiệm
+            content = (
+                f"Review có tâm sau gần 1 tháng mặc thử em '{item_name}' này cho {addr} đây {p} 💖\n\n"
+                f"Ưu điểm lớn nhất là lên form cực chuẩn, che khuyết điểm tốt và giặt máy không lo phai hay bai xù. "
+                f"Lúc trước mua giá gốc hơn {price_orig:,}đ, nay lướt Shopee Mall thấy mở Flash Sale còn có {price_sale:,}đ giật mình luôn.\n\n"
+                f"Hơn {sold:,} chị em đã feedback {rating} sao, ai chuẩn bị đi chơi / đi làm thì vợt ngay nhé:\n"
+                f"👉 Link Shopee Mall chính hãng: {tracking_url}\n\n"
+                f"#reviewcotam #doxinhchupanh #shopeehaul #giasoc"
+            )
+        else:
+            # Kịch bản gom chung / giải pháp hack dáng
+            content = (
+                f"Cứu tinh cho {addr} nào đang đau đầu tìm đồ hack dáng đi chơi/đi làm đây {p} 💃✨\n\n"
+                f"Em '{item_name}' này thiết kế siêu nịnh dáng, chất vải mềm mát rũ nhẹ.\n"
+                f"Mall đang chạy đợt trợ giá xả kho: Chỉ {price_sale:,}đ (gốc {price_orig:,}đ - giảm tận {discount}%).\n"
+                f"Nhớ bỏ giỏ sớm rồi tick thêm mã miễn phí vận chuyển 0Đ lúc thanh toán nha {addr}!\n\n"
+                f"🔗 Link săn sale chính hãng: {tracking_url}\n\n"
+                f"#hackdang #thoitrangnu #doxinhgiare #shopeesale"
             )
         return content, tpl_id
 
@@ -358,13 +409,237 @@ class PostComposer:
                 f"👉 Săn ngay tại gian hàng chính hãng: {tracking_url}\n\n"
                 f"#gadgets #congnghedoisong #phukiendienthoai #freeship"
             )
-        else:
+        elif tpl_idx == 4:
             content = (
                 f"Phát hiện deal phụ kiện công nghệ ngon cho {addr} {p} 👇\n\n"
                 f"Con '{item_name}' chính hãng Mall đang sale sốc còn {price_sale:,}đ.\n"
                 f"Độ bền cao, tính năng ổn định vượt tầm giá. Áp thêm mã voucher ví để giảm thêm {p}.\n"
                 f"🔗 Link chốt deal Shopee: {tracking_url}\n\n"
                 f"#reviewcongnghe #phukienchinhhang #shopee"
+            )
+        elif tpl_idx == 5:
+            # Kịch bản cảnh báo hàng trôi nổi vs Mua hàng Mall chuẩn
+            content = (
+                f"Cảnh báo {addr} đừng ham mấy món phụ kiện điện tử noname trôi nổi bán ngoài đường nha {p} ⚡🔌\n\n"
+                f"Mấy món điện tử dùng lâu ngày hay bị chập chờn, chai pin rất nguy hiểm. "
+                f"Ai cần đồ bền bỉ, chuẩn bảo hành hãng thì nghía con '{item_name}' này ở Shopee Mall.\n\n"
+                f"• Giá sale sốc hôm nay: {price_sale:,}đ (Giá gốc: {price_orig:,}đ)\n"
+                f"• Hơn {sold:,} người dùng đánh giá {rating}/5.0 sao chất lượng thực tế\n"
+                f"👉 Link săn sale chính hãng: {tracking_url}\n\n"
+                f"#canhbao #hangchinhhang #phukientot #shopeemall"
+            )
+        else:
+            # Kịch bản nâng cấp góc làm việc / setup
+            content = (
+                f"Review nhanh cho {addr} đang muốn nâng cấp góc làm việc / giải trí tại nhà {p} 🖥️🖱️\n\n"
+                f"Vừa tậu con '{item_name}' này về test thử thấy quá hời so với số tiền bỏ ra. "
+                f"Thiết kế tinh tế, độ trễ thấp, cắm là nhận ngay không cần cài đặt rườm rà.\n"
+                f"Hôm nay Mall đang trợ giá chớp nhoáng còn {price_sale:,}đ (tiết kiệm {price_orig - price_sale:,}đ).\n\n"
+                f"🔗 Link Mall chốt deal cho bác nào cần: {tracking_url}\n\n"
+                f"#setupbanlamviec #dochoicongnghe #techgear #shopeevn"
+            )
+        return content, tpl_id
+
+    def _render_home_living(self, deal: Dict, group: Dict, tracking_url: str, tpl_idx: int) -> Tuple[str, str]:
+        """Kịch bản chuyên biệt cho nhóm Nhà Cửa & Đời Sống / Gia Dụng / Yêu Bếp / Nghiện Nhà"""
+        p = LinguisticPermutator.get_particle()
+        addr = LinguisticPermutator.get_addressing("home")
+        item_name = deal.get("name", "Đồ gia dụng")
+        price_sale = int(deal.get("price_sale", 0))
+        price_orig = int(deal.get("price_original", 0))
+        discount = deal.get("discount_percent", 0)
+        sold = deal.get("historical_sold", 0)
+        rating = deal.get("rating_star", 5.0)
+        tpl_id = f"HOME_TPL_{tpl_idx}"
+
+        if tpl_idx == 1:
+            content = (
+                f"Góc Yêu Bếp & Nghiện Nhà chia sẻ món đồ cực tiện cho {addr} {p} 🏡🍳\n\n"
+                f"Em '{item_name}' này dùng siêu tiện mà nay đang có đợt Flash Sale trợ giá lớn bên Shopee Mall:\n"
+                f"• Giá chốt hôm nay: {price_sale:,}đ (Giá gốc: {price_orig:,}đ - Giảm {discount}%)\n"
+                f"• Hơn {sold:,} gia đình đã mua và chấm {rating}⭐ hài lòng\n\n"
+                f"Bác nào đang muốn căn bếp/ngôi nhà gọn gàng, tiện nghi hơn thì tranh thủ gom sớm {p}:\n"
+                f"👉 Link mua chính hãng Shopee Mall: {tracking_url}\n\n"
+                f"#nghiennha #yeubep #dogiadung #nhacuadoisong #shopeemall"
+            )
+        elif tpl_idx == 2:
+            content = (
+                f"Cứu cánh cho hội bận rộn không có nhiều thời gian dọn dẹp nội trợ đây {addr} ơi ⏱️✨\n\n"
+                f"Từ ngày sắm em '{item_name}' này công việc nhà nhàn tênh, tiết kiệm bao nhiêu thời gian.\n"
+                f"Hàng chuẩn hãng, gia công chắc chắn, Mall đang sale chạm đáy chỉ {price_sale:,}đ (gốc {price_orig:,}đ).\n"
+                f"Đã có {sold:,} người mua kiểm chứng {rating} sao chất lượng.\n\n"
+                f"🔗 Link chốt deal hời: {tracking_url}\n\n"
+                f"#meovatnhacua #dogiadungthongminh #nhacuatienich #giasale"
+            )
+        elif tpl_idx == 3:
+            content = (
+                f"Decor và tân trang lại không gian sống với giá siêu hời cùng {addr} {p} 🪴🌿\n\n"
+                f"Mẫu '{item_name}' này để vào góc phòng hay căn bếp trông sang xịn hẳn lên.\n"
+                f"Hôm nay Shopee đang có mã trợ giá Flash Sale: Chỉ {price_sale:,}đ (-{discount}%).\n"
+                f"Nhớ lấy mã giảm giá 15% và mã Freeship 0Đ tại giỏ hàng trước khi đặt nha {p}!\n\n"
+                f"👉 Link xem sản phẩm chi tiết: {tracking_url}\n\n"
+                f"#decorphong #nhadep #giadunggiare #shopee"
+            )
+        elif tpl_idx == 4:
+            content = (
+                f"Review thật lòng cho {addr}: Mua đồ gia dụng đừng ham đồ nhựa chợ ọp ẹp ⚠️\n\n"
+                f"Em này '{item_name}' hoàn thiện dày dặn, chịu nhiệt tốt, dùng bền bỉ cả năm không lo nứt gãy. "
+                f"Shop Mall chính hãng đang có đợt trợ giá xả kho rẻ hơn ngày thường rất nhiều:\n"
+                f"• Giá sale chỉ còn: {price_sale:,}đ (Tiết kiệm ngay {price_orig - price_sale:,}đ)\n"
+                f"• Feedback {rating}/5.0 sao với {sold:,} lượt bán uy tín\n\n"
+                f"🔗 Link Mall chính hãng đây {p}: {tracking_url}\n\n"
+                f"#dogiadungtot #muasamsale #reviewgiadung #shopeemall"
+            )
+        elif tpl_idx == 5:
+            content = (
+                f"Có bác nào trong nhóm mình đang dùng em '{item_name}' này chưa ạ? 👀\n\n"
+                f"Thấy mn trong hội khen em này tiện lắm, nay vô tình lướt thấy Flash Sale tụt từ {price_orig:,}đ còn {price_sale:,}đ.\n"
+                f"Review hơn {sold:,} lượt mua bảo hàng đóng gói rất kỹ, chuẩn chỉ.\n"
+                f"Ai cũng đang ngắm nghía đồ gia dụng thì tham khảo chung deal thơm này nhé:\n"
+                f"👉 Link ưu đãi Mall: {tracking_url}\n\n"
+                f"#hoinhacua #dogiadung #gocbep #dealhot"
+            )
+        else:
+            content = (
+                f"Kèo đồ gia dụng xịn xò cho {addr} sắm sửa nhà cửa hôm nay {p} 🏷️🏠\n\n"
+                f"Món '{item_name}' đang có đợt Flash Sale chớp nhoáng: Giảm {discount}% chỉ còn {price_sale:,}đ.\n"
+                f"Hàng chính hãng chuẩn chỉ, bảo hành đầy đủ. Áp thêm voucher ví ShopeePay là giá bao rẻ {p}!\n\n"
+                f"🔗 Link đặt hàng chính hãng: {tracking_url}\n\n"
+                f"#sansalegiadung #nhacuatoiyeu #shopeedeal #freeship"
+            )
+        return content, tpl_id
+
+    def _render_beauty(self, deal: Dict, group: Dict, tracking_url: str, tpl_idx: int) -> Tuple[str, str]:
+        """Kịch bản chuyên biệt cho nhóm Sắc Đẹp / Mỹ Phẩm / Skincare / Makeup"""
+        p = LinguisticPermutator.get_particle()
+        addr = LinguisticPermutator.get_addressing("beauty")
+        item_name = deal.get("name", "Mỹ phẩm")
+        price_sale = int(deal.get("price_sale", 0))
+        price_orig = int(deal.get("price_original", 0))
+        discount = deal.get("discount_percent", 0)
+        sold = deal.get("historical_sold", 0)
+        rating = deal.get("rating_star", 5.0)
+        tpl_id = f"BEAUTY_TPL_{tpl_idx}"
+
+        if tpl_idx == 1:
+            content = (
+                f"Góc Skincare & Làm Đẹp chuẩn y khoa cho {addr} đây {p} 💄✨\n\n"
+                f"Em '{item_name}' này thuộc hàng best-seller, dùng dịu nhẹ không hề kích ứng da.\n"
+                f"• Giá gốc: {price_orig:,}đ ➡️ Đang Flash Sale Mall còn: {price_sale:,}đ (-{discount}%)\n"
+                f"• Hơn {sold:,} người dùng đánh giá {rating}⭐ cực nhiều feedback thật\n\n"
+                f"Chị em tranh thủ đợt sale này trữ sẵn chăm sóc da nha {p}:\n"
+                f"👉 Link Shopee Mall chính hãng: {tracking_url}\n\n"
+                f"#skincare #duongda #myphamchinhhang #shopeemall #lamdep"
+            )
+        elif tpl_idx == 2:
+            content = (
+                f"Cảnh báo {addr} đừng mua mỹ phẩm trôi nổi giá bèo ngoài đường hại da nha ⚠️🌸\n\n"
+                f"Đồ bôi lên mặt cứ chọn thẳng gian hàng Mall chính hãng cho yên tâm 100%. "
+                f"Em '{item_name}' này shop Mall đang có mã trợ giá cực hời: Chỉ {price_sale:,}đ (gốc {price_orig:,}đ).\n"
+                f"Hơn {sold:,} người mua chứng thực chất lượng {rating}/5.0 sao.\n\n"
+                f"🔗 Link Mall chính hãng phân phối tại đây {p}: {tracking_url}\n\n"
+                f"#myphamchuanauth #chamsocda #reviewskincare #shopee"
+            )
+        elif tpl_idx == 3:
+            content = (
+                f"Review chân thật sau gần 3 tuần trải nghiệm em '{item_name}' cho {addr} 💖\n\n"
+                f"Cảm nhận rõ rệt là chất mịn thấm nhanh, không bết dính tí nào. "
+                f"Trước mình mua đắt hơn nhiều, nay thấy Shopee Mall Flash Sale còn đúng {price_sale:,}đ nên share vội cho mn.\n\n"
+                f"Nhớ bỏ giỏ rồi lấy thêm voucher Freeship 0Đ áp lúc thanh toán nha:\n"
+                f"👉 Link ưu đãi Mall chính hãng: {tracking_url}\n\n"
+                f"#reviewmypham #routineduongda #goclamdep #dealhot"
+            )
+        elif tpl_idx == 4:
+            content = (
+                f"Deal mỹ phẩm xinh xỉu cho {addr} tút tát nhan sắc hôm nay {p} 💋✨\n\n"
+                f"Mẫu '{item_name}' hot rần rần trên TikTok nay Shopee Mall giảm tận {discount}%, chỉ còn {price_sale:,}đ.\n"
+                f"Lên tone cực tự nhiên, hợp mọi loại da. Đã có {sold:,} lượt chốt đơn uy tín.\n\n"
+                f"🔗 Link săn deal chính hãng: {tracking_url}\n\n"
+                f"#makeuptutorial #sonmoi #kemduong #sansaleshopee"
+            )
+        elif tpl_idx == 5:
+            content = (
+                f"Chị em mình trong nhóm có ai đang xài em '{item_name}' này không cho em xin review với {p} 🥰\n\n"
+                f"Thấy feedback khen nức nở với hơn {sold:,} lượt mua 5 sao. "
+                f"Đặc biệt hôm nay đang Flash Sale giảm từ {price_orig:,}đ xuống còn {price_sale:,}đ hời quá định múc luôn.\n"
+                f"Nàng nào cũng đang tìm món này thì nghía chung nhé:\n"
+                f"👉 Link Shopee Mall: {tracking_url}\n\n"
+                f"#hoimypham #gocchamsocda #lamdepmoingay #shopeevn"
+            )
+        else:
+            content = (
+                f"Mách nhỏ {addr} deal skincare giá học sinh sinh viên nhưng chất lượng chuẩn auth {p} 🌸🌿\n\n"
+                f"Em '{item_name}' đang sale chạm đáy còn đúng {price_sale:,}đ (tiết kiệm {price_orig - price_sale:,}đ).\n"
+                f"Bác nào da dầu mụn hay nhạy cảm thì em này là chân ái luôn đấy ạ.\n\n"
+                f"🔗 Link đặt mua chính hãng: {tracking_url}\n\n"
+                f"#danhchodamun #skincaregiare #hangauth #shopeesale"
+            )
+        return content, tpl_id
+
+    def _render_mom_baby(self, deal: Dict, group: Dict, tracking_url: str, tpl_idx: int) -> Tuple[str, str]:
+        """Kịch bản chuyên biệt cho nhóm Mẹ & Bé / Hội Mẹ Bỉm Sữa"""
+        p = LinguisticPermutator.get_particle()
+        addr = LinguisticPermutator.get_addressing("mom")
+        item_name = deal.get("name", "Đồ mẹ và bé")
+        price_sale = int(deal.get("price_sale", 0))
+        price_orig = int(deal.get("price_original", 0))
+        discount = deal.get("discount_percent", 0)
+        sold = deal.get("historical_sold", 0)
+        rating = deal.get("rating_star", 5.0)
+        tpl_id = f"BABY_TPL_{tpl_idx}"
+
+        if tpl_idx == 1:
+            content = (
+                f"Góc Mẹ Bỉm Thông Thái: Chăm con nhàn tênh cùng {addr} {p} 👶🍼\n\n"
+                f"Chia sẻ với các mẹ em '{item_name}' này dùng siêu tiện lợi, an toàn tuyệt đối cho bé yêu.\n"
+                f"• Giá gốc: {price_orig:,}đ ➡️ Đang Flash Sale Mall còn: {price_sale:,}đ (-{discount}%)\n"
+                f"• Hơn {sold:,} mẹ bỉm đã mua và đánh giá {rating}⭐ cực tốt\n\n"
+                f"Các mẹ tranh thủ đợt sale này gom sẵn đồ cho con vừa tiết kiệm vừa an tâm nha {p}:\n"
+                f"👉 Link Shopee Mall chính hãng: {tracking_url}\n\n"
+                f"#mebimthongthai #chamsocconyeu #dometre #shopeemall"
+            )
+        elif tpl_idx == 2:
+            content = (
+                f"Đồ cho con nhỏ cứ chọn đúng gian hàng Mall chính hãng cho an tâm 100% các mom ơi 🧸✨\n\n"
+                f"Em '{item_name}' chất liệu an toàn, nguồn gốc rõ ràng, không gây kích ứng cho bé.\n"
+                f"Shop Mall đang có trợ giá giảm sâu: Chỉ còn {price_sale:,}đ (gốc {price_orig:,}đ).\n"
+                f"Hơn {sold:,} mom đã đặt mua và feedback cực hài lòng.\n\n"
+                f"🔗 Link mua chính hãng cho các bé: {tracking_url}\n\n"
+                f"#chamsocbesosinh #mebe #dochoiantoan #shopeevn"
+            )
+        elif tpl_idx == 3:
+            content = (
+                f"Bí kíp tiết kiệm tiền bỉm sữa hàng tháng cho {addr} đây {p} 💰🤱\n\n"
+                f"Cứ canh đúng đợt Flash Sale Mall mà mua em '{item_name}' này là tiết kiệm được cả mớ tiền.\n"
+                f"Hôm nay sale còn đúng {price_sale:,}đ (tiết kiệm ngay {price_orig - price_sale:,}đ so với giá niêm yết).\n"
+                f"Các mom nhớ áp thêm mã miễn phí vận chuyển 0Đ lúc thanh toán nhé:\n\n"
+                f"👉 Link săn sale cho bé: {tracking_url}\n\n"
+                f"#tietkiemtientieudung #bimsua #sansalemebe #shopee"
+            )
+        elif tpl_idx == 4:
+            content = (
+                f"Review thật lòng cho các mom: Món '{item_name}' này mua 1 lần dùng mãi cực bền 🌟\n\n"
+                f"Bé nhà mình dùng thích lắm, đường nét bo tròn cẩn thận. "
+                f"Shop Mall đang chạy chương trình khuyến mại lớn: Giảm {discount}% chỉ còn {price_sale:,}đ.\n"
+                f"Feedback {rating} sao từ {sold:,} phụ huynh đã trải nghiệm thực tế.\n\n"
+                f"🔗 Link chốt đơn Mall chính hãng: {tracking_url}\n\n"
+                f"#reviewdometre #bimsuachinhhang #mebimsua #dealhot"
+            )
+        elif tpl_idx == 5:
+            content = (
+                f"Có mom nào trong nhóm mình đang cho bé dùng món '{item_name}' này chưa ạ? 🍼👶\n\n"
+                f"Thấy các mẹ trên diễn đàn khen nhiều quá, nay lướt Shopee thấy Flash Sale giảm từ {price_orig:,}đ còn {price_sale:,}đ.\n"
+                f"Mẹ nào cũng đang cần sắm đồ cho con thì tham khảo chung deal hời này nha:\n"
+                f"👉 Link ưu đãi tại đây ạ: {tracking_url}\n\n"
+                f"#hoimebim #chamsoccon #dososinh #shopeedeal"
+            )
+        else:
+            content = (
+                f"Deal hời cho bé yêu - Giải tỏa áp lực chi tiêu cho {addr} hôm nay {p} 💕🧸\n\n"
+                f"Món '{item_name}' chính hãng Shopee Mall đang sale chạm đáy: Chỉ {price_sale:,}đ.\n"
+                f"Chất lượng chuẩn y khoa, đóng gói cẩn thận. Các mom tranh thủ múc kẻo hết mã trợ giá {p}!\n\n"
+                f"🔗 Link đặt mua chính hãng: {tracking_url}\n\n"
+                f"#yeucon #mebimthoitrang #dometreem #freeship"
             )
         return content, tpl_id
 
@@ -377,8 +652,8 @@ class PostComposer:
         discount = deal.get("discount_percent", 0)
         sold = deal.get("historical_sold", 0)
         rating = deal.get("rating_star", 5.0)
-
         tpl_id = f"GEN_TPL_{tpl_idx}"
+
         if tpl_idx == 1:
             content = (
                 f"🔥 [TỔNG HỢP DEAL FLASH SALE SHOPEE HÔM NAY] 🔥\n\n"
@@ -405,7 +680,7 @@ class PostComposer:
                 f"👉 Link gian hàng ưu đãi: {tracking_url}\n\n"
                 f"#giamgia #dealshock #freeship #shopee"
             )
-        else:
+        elif tpl_idx == 4:
             content = (
                 f"Góc chia sẻ deal hời: Em '{item_name}' đang giảm chạm đáy {p} 👇\n\n"
                 f"• Giá flash sale: {price_sale:,}đ (Tiết kiệm {price_orig - price_sale:,}đ)\n"
@@ -413,6 +688,26 @@ class PostComposer:
                 f"Nhớ lưu voucher tại giỏ hàng trước khi bấm thanh toán {p}!\n"
                 f"🔗 Link chốt đơn: {tracking_url}\n\n"
                 f"#dealhot #muasamsale #shopeemall"
+            )
+        elif tpl_idx == 5:
+            # Kịch bản gom chung / xả kho chớp nhoáng
+            content = (
+                f"Kèo hời không thể bỏ lỡ cho {addr} hôm nay: Em '{item_name}' Mall vừa mở kho sale chớp nhoáng ⚡💥\n\n"
+                f"Giá tụt từ {price_orig:,}đ xuống còn đúng {price_sale:,}đ (-{discount}%).\n"
+                f"Đã có hơn {sold:,} người mua thực tế với đánh giá {rating}/5.0 sao chuẩn xịn.\n"
+                f"Tranh thủ chốt sớm kẻo hết lượt trợ giá nha cả nhà {p}!\n\n"
+                f"👉 Link đặt mua trực tiếp: {tracking_url}\n\n"
+                f"#keothom #sansaleshopee #xakho #dealngon"
+            )
+        else:
+            # Kịch bản đánh giá khách quan
+            content = (
+                f"Lướt sàn thấy con '{item_name}' này đang lọt top bán chạy nhất hôm nay share cho {addr} {p} 📈✨\n\n"
+                f"• Đã bán: {sold:,} đơn | Điểm đánh giá: {rating}⭐\n"
+                f"• Giá sale sốc: {price_sale:,}đ (Rẻ hơn ngày thường {price_orig - price_sale:,}đ)\n"
+                f"Hàng chính hãng phân phối, mua về dùng hay làm quà đều cực hợp lý {p}.\n\n"
+                f"🔗 Link gian hàng chính hãng: {tracking_url}\n\n"
+                f"#topbanchay #shopeehaul #muasamthongminh #dealhot"
             )
         return content, tpl_id
 
@@ -444,10 +739,13 @@ class PostComposer:
         recent_posts = []
         if self.db:
             try:
-                last_tpl_id = self.db.get_group_last_template_id(group_id)
+                last_tpl_id = self.db.get_group_last_template_id(group_id, group_name=group_name)
                 recent_posts = self.db.get_recent_post_contents_for_group(group_name, limit=8)
             except Exception:
-                pass
+                try:
+                    last_tpl_id = self.db.get_group_last_template_id(group_id)
+                except Exception:
+                    pass
 
         # Xác định render function theo category
         cat_match = self.matcher.match_group(group_cat=group_cat, group_name=group_name)
@@ -456,28 +754,47 @@ class PostComposer:
 
         if matched_cat == "Thời Trang Nam":
             renderer = self._render_fashion_men
-        elif matched_cat in ("Thời Trang Nữ", "Sắc Đẹp"):
+            cat_prefix = "MEN_TPL"
+        elif matched_cat == "Thời Trang Nữ":
             renderer = self._render_fashion_women
+            cat_prefix = "WOMEN_TPL"
+        elif matched_cat in ("Sắc Đẹp", "Mỹ Phẩm"):
+            renderer = self._render_beauty
+            cat_prefix = "BEAUTY_TPL"
+        elif matched_cat in ("Nhà Cửa & Đời Sống", "Thiết Bị Điện Gia Dụng"):
+            renderer = self._render_home_living
+            cat_prefix = "HOME_TPL"
+        elif matched_cat in ("Mẹ & Bé", "Mẹ và Bé"):
+            renderer = self._render_mom_baby
+            cat_prefix = "BABY_TPL"
         elif matched_cat == "Thiết Bị Điện Tử":
             renderer = self._render_electronics
+            cat_prefix = "TECH_TPL"
         else:
             renderer = self._render_general
+            cat_prefix = "GEN_TPL"
 
-        total_templates = 4
+        total_templates = 6
         # Lọc danh sách template IDs khả dụng, ưu tiên khác last_tpl_id
         tpl_indices = list(range(1, total_templates + 1))
         random.shuffle(tpl_indices)
 
-        # A/B Testing Auto-Select: Nếu có template có CTR cao nhất trong quá khứ cho ngành hàng này, đưa lên đầu ưu tiên
-        cat_prefix = "MEN_TPL" if matched_cat == "Thời Trang Nam" else (
-            "WOMEN_TPL" if matched_cat in ("Thời Trang Nữ", "Sắc Đẹp") else (
-                "TECH_TPL" if matched_cat == "Thiết Bị Điện Tử" else "GEN_TPL"
-            )
-        )
+        # Chuyển index của template vừa dùng xuống cuối cùng để xoay vòng 100%
+        if last_tpl_id and "_" in last_tpl_id:
+            try:
+                last_idx = int(last_tpl_id.split("_")[-1])
+                if last_idx in tpl_indices and len(tpl_indices) > 1:
+                    tpl_indices.remove(last_idx)
+                    tpl_indices.append(last_idx)
+            except Exception:
+                pass
+
+        # A/B Testing Auto-Select: Nếu có template có CTR cao nhất trong quá khứ cho ngành hàng này, đưa lên đầu ưu tiên (nếu không trùng với bài vừa đăng)
         best_past_idx = self.get_best_performing_template(cat_prefix)
         if best_past_idx and best_past_idx in tpl_indices:
-            tpl_indices.remove(best_past_idx)
-            tpl_indices.insert(0, best_past_idx)
+            if not last_tpl_id or f"{cat_prefix}_{best_past_idx}" != last_tpl_id:
+                tpl_indices.remove(best_past_idx)
+                tpl_indices.insert(0, best_past_idx)
 
         best_content = ""
         best_tpl_id = ""

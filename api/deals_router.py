@@ -170,6 +170,108 @@ def get_deals_by_category(category: str):
         return [dict(r) for r in rows]
 
 
+@router.post("/api/deals/audit-and-clean")
+def audit_and_clean_deals_api(
+    min_sold: int = 50,
+    min_rating: float = 4.0,
+    delete_stale: bool = True
+):
+    """
+    Quét toàn bộ kho sản phẩm:
+    1. Lọc và xóa bớt các deal lỗi, giá <= 0, ôi thiu (is_stale=1), lượt bán quá thấp (< min_sold) hoặc đánh giá sao kém (< min_rating).
+    2. Chuẩn hóa & phân loại lại đúng danh mục ngành hàng theo CategoryMatcher cho toàn bộ sản phẩm còn lại.
+    3. Cập nhật tồn kho ngành hàng và trả về báo cáo kết quả chi tiết.
+    """
+    from config.category_mapping import CategoryMatcher
+    from config.categories_filter import translate_category
+    matcher = CategoryMatcher()
+
+    with db.get_connection() as conn:
+        all_deals = conn.execute("SELECT * FROM deals").fetchall()
+        total_scanned = len(all_deals)
+
+        # 1. Tìm các sản phẩm cần xóa bớt
+        bad_ids = []
+        for d in all_deals:
+            item_id = str(d["item_id"])
+            price_sale = float(d["price_sale"] or 0)
+            name = (d["name"] or "").strip()
+            is_stale = int(d["is_stale"] or 0)
+            rating = float(d["rating_star"] or 0)
+            sold = int(d["historical_sold"] or 0)
+            deal_type = str(d["deal_type"] or "").upper() if "deal_type" in d.keys() else ""
+
+            # Điều kiện loại bỏ:
+            # - Tên rỗng hoặc giá không hợp lệ
+            # - Đã bị đánh dấu stale / hết hạn / hết hàng (nếu delete_stale = True)
+            # - Rating thấp < min_rating (đối với sản phẩm có rating)
+            # - Lượt bán quá ế (< min_sold), trừ deal mồi 1k
+            is_bad = False
+            if not name or price_sale <= 0:
+                is_bad = True
+            elif delete_stale and is_stale == 1:
+                is_bad = True
+            elif rating > 0 and rating < min_rating:
+                is_bad = True
+            elif sold < min_sold and price_sale > 1000 and "LOSS_LEADER" not in deal_type:
+                is_bad = True
+
+            if is_bad:
+                bad_ids.append(item_id)
+
+        # Xóa các deal xấu khỏi CSDL theo batch
+        deleted_count = len(bad_ids)
+        if bad_ids:
+            for i in range(0, len(bad_ids), 100):
+                chunk = bad_ids[i:i + 100]
+                placeholders = ",".join(["?"] * len(chunk))
+                conn.execute(f"DELETE FROM deals WHERE item_id IN ({placeholders})", chunk)
+                try:
+                    conn.execute(f"DELETE FROM price_history WHERE item_id IN ({placeholders})", chunk)
+                except Exception:
+                    pass
+            conn.commit()
+
+        # 2. Phân loại lại toàn bộ sản phẩm còn lại
+        remaining_deals = conn.execute("SELECT item_id, name, category_name FROM deals").fetchall()
+        remaining_count = len(remaining_deals)
+        reclassified_count = 0
+
+        for d in remaining_deals:
+            item_id = str(d["item_id"])
+            name = d["name"] or ""
+            current_cat = d["category_name"] or ""
+
+            # Nhận diện ngành qua CategoryMatcher
+            text_match = matcher.detect_category_from_text(name)
+            if text_match:
+                new_cat = text_match["rule"]["category_name"]
+            else:
+                new_cat = db.classify_product_niche(name, current_cat)
+
+            new_cat = translate_category(new_cat)
+
+            if new_cat and new_cat != current_cat:
+                conn.execute("UPDATE deals SET category_name = ? WHERE item_id = ?", (new_cat, item_id))
+                reclassified_count += 1
+
+        conn.commit()
+
+        # Tính tồn kho sau khi dọn dẹp
+        inv_rows = conn.execute("SELECT category_name, count(*) FROM deals WHERE is_stale = 0 GROUP BY category_name").fetchall()
+        inv_map = {r[0]: r[1] for r in inv_rows}
+
+    return {
+        "status": "SUCCESS",
+        "total_scanned": total_scanned,
+        "deleted_count": deleted_count,
+        "reclassified_count": reclassified_count,
+        "remaining_count": remaining_count,
+        "category_inventory": inv_map,
+        "message": f"Đã quét {total_scanned} sản phẩm: Xóa bỏ {deleted_count} deal lỗi/hết hàng/bán ế, chuẩn hóa lại danh mục cho {reclassified_count} sản phẩm! Hiện còn {remaining_count} sản phẩm chất lượng cao."
+    }
+
+
 @router.post("/api/deals/clear")
 def clear_deals():
     db.clear_deals()

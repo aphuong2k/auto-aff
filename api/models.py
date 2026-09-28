@@ -72,6 +72,7 @@ class ScheduleModel(BaseModel):
 class SingleGroupPostRequest(BaseModel):
     group_id: str
     deal_id: Optional[str] = None
+    account_id: Optional[object] = None
 
 
 class GradualPostRequest(BaseModel):
@@ -80,6 +81,7 @@ class GradualPostRequest(BaseModel):
     max_delay_seconds: Optional[int] = 120
     group_ids: Optional[List[str]] = None
     delay_seconds: Optional[int] = None
+    account_id: Optional[object] = None
 
 
 class RunWorkflowRequest(BaseModel):
@@ -118,6 +120,12 @@ class RetryNodeRequest(BaseModel):
     group_id: str
 
 
+class CheckGroupHealthRequest(BaseModel):
+    group_url: Optional[str] = None
+    group_id: Optional[str] = None
+    account_id: Optional[object] = None
+
+
 class AddGroupRequest(BaseModel):
     url: str
     name: Optional[str] = ""
@@ -151,3 +159,4 @@ class PublishPromoPostModel(BaseModel):
     group_id: Optional[str] = None
     content: str
     post_type_label: Optional[str] = "Bài Khuyến Mại / Voucher"
+    account_id: Optional[object] = None

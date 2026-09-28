@@ -60,7 +60,9 @@ class FacebookGroupPoster:
         self.matcher = CategoryMatcher()
         self._last_composed_meta: Dict = {}
         from modules.outreach.fb_account_manager import FacebookAccountManager
+        from modules.outreach.join_feedback_monitor import JoinFeedbackMonitor
         self.account_mgr = FacebookAccountManager(self.db)
+        self.feedback_monitor = JoinFeedbackMonitor(self.db)
 
     def find_best_deal_for_group(self, group: Dict, strict: bool = True) -> Optional[Dict]:
         """
@@ -77,40 +79,40 @@ class FacebookGroupPoster:
         sub_name_filter = self.matcher.build_sub_category_name_filter(match_result)
 
         with self.db.get_connection() as conn:
-            # 1. Nếu có sub-category (VD: nhóm iPhone → ưu tiên deal iPhone trước)
+            # 1. Nếu có sub-category (VD: nhóm iPhone → random trong top deal iPhone)
             if sub_name_filter:
-                row = conn.execute(f"""
+                sub_rows = conn.execute(f"""
                     SELECT * FROM deals 
                     WHERE ({category_condition}) AND ({sub_name_filter})
                       AND is_stale = 0 
-                    ORDER BY deal_score DESC LIMIT 1
-                """).fetchone()
-                if row:
-                    return dict(row)
+                    ORDER BY deal_score DESC LIMIT 10
+                """).fetchall()
+                if sub_rows:
+                    return dict(random.choice(sub_rows))
 
-            # 2. Query theo category chính
+            # 2. Query theo category chính: chọn ngẫu nhiên trong top 15 deal
             if match_result["matched_by"] != "general":
                 rows = conn.execute(f"""
                     SELECT * FROM deals 
                     WHERE ({category_condition}) AND is_stale = 0 
-                    ORDER BY deal_score DESC LIMIT 5
+                    ORDER BY deal_score DESC LIMIT 15
                 """).fetchall()
                 if rows:
                     return dict(random.choice(rows))
                 return None  # Strict: không lấy ngành khác
 
-            # 3. General / Săn Deal Tổng Hợp → lấy deal score cao nhất
+            # 3. General / Săn Deal Tổng Hợp → lấy ngẫu nhiên trong top 20 deal
             rows = conn.execute("""
                 SELECT * FROM deals 
                 WHERE is_stale = 0
-                ORDER BY deal_score DESC LIMIT 10
+                ORDER BY deal_score DESC LIMIT 20
             """).fetchall()
             if rows:
                 return dict(random.choice(rows))
 
             # 4. Chỉ khi strict=False mới lấy ngẫu nhiên deal bất kỳ
             if not strict:
-                all_deals = conn.execute("SELECT * FROM deals WHERE is_stale = 0 ORDER BY deal_score DESC LIMIT 10").fetchall()
+                all_deals = conn.execute("SELECT * FROM deals WHERE is_stale = 0 ORDER BY deal_score DESC LIMIT 25").fetchall()
                 if all_deals:
                     return dict(random.choice(all_deals))
 
@@ -136,12 +138,13 @@ class FacebookGroupPoster:
         page=None,
         auto_close_browser=True,
         custom_content: Optional[str] = None,
-        account: Optional[Dict] = None
+        account: Optional[Dict] = None,
+        account_id: Optional[object] = None
     ) -> Dict:
         """
         Thực hiện đăng bài viết thực tế vào tường một nhóm Facebook bằng Playwright.
         Hỗ trợ cả bài đăng deal lẻ theo ngành hoặc bài tổng hợp khuyến mại / mã voucher tùy biến.
-        Hỗ trợ luân phiên đa tài khoản Facebook (Multi-Account Rotation).
+        Hỗ trợ chọn tài khoản cố định hoặc luân phiên khi được yêu cầu.
         """
         start_time = datetime.now()
         with self.db.get_connection() as conn:
@@ -198,30 +201,16 @@ class FacebookGroupPoster:
 
         # Xác định tài khoản Facebook sử dụng cho lượt đăng này
         if account is None:
-            try:
-                from modules.workflow.account_router import AccountRouter
-                router = AccountRouter(self.db)
-                chosen_acc, r_status, r_msg = router.select_best_account_for_group(group_id, task_type="POST")
-                if chosen_acc:
-                    account = chosen_acc
-                else:
-                    poster_logger.warning(f"⚠️ [ACCOUNT ROUTER]: {r_msg}")
-                    if r_status in ["ALL_IN_COOLDOWN", "LIMIT_REACHED", "NO_ACTIVE_ACCOUNTS"]:
-                        return {
-                            "status": "COOLDOWN_ACTIVE" if r_status == "ALL_IN_COOLDOWN" else "FAILED",
-                            "group_id": group_id,
-                            "group_name": group.get("name", group_id),
-                            "message": r_msg
-                        }
-            except Exception as router_err:
-                poster_logger.warning(f"⚠️ Lỗi khởi tạo AccountRouter: {router_err}")
-                account, _ = self.account_mgr.get_next_account(task_type="POST")
+            from modules.outreach.fb_account_manager import resolve_fb_account
+            allow_rot = (str(account_id).strip().lower() == "rotate")
+            account, _, _ = resolve_fb_account(self.db, account_id=account_id, allow_rotation=allow_rot, task_type="POST")
 
         if account:
             fb_cookie = account.get("cookie", "").strip()
             fb_profile = account.get("profile_path", "").strip()
             acc_name = account.get("name", "Nick FB")
             acc_id = account.get("id")
+
         else:
             fb_cookie = os.getenv("FB_COOKIE", "").strip()
             fb_profile = os.getenv("FB_CHROME_PROFILE", "").strip()
@@ -281,6 +270,89 @@ class FacebookGroupPoster:
             page.goto(group_url, timeout=40000, wait_until="domcontentloaded")
             page.wait_for_timeout(3500)
 
+            body_text = page.locator("body").inner_text()
+            body_lower = body_text.lower()
+
+            # 0. Thẩm định quyền đăng bài & TỰ ĐỘNG CHO COOK nếu nhóm không cho phép đăng:
+            # A. Nhóm đã die / URL không tồn tại / Bị chặn
+            if "nội dung này hiện không khả dụng" in body_lower or "this content isn't available" in body_lower:
+                poster_logger.warning(f"🚫 [CHO COOK]: Nhóm [{group_name}] không khả dụng hoặc đã đóng cửa. Đã loại bỏ (status=LEFT, enabled=0)!")
+                self.db.update_group_status(group_id, "LEFT")
+                with self.db.get_connection() as conn:
+                    conn.execute("UPDATE fb_groups SET enabled = 0, posting_restricted = 1, health_verdict = 'UNAVAILABLE_COOKED' WHERE group_id = ?", (group_id,))
+                    conn.commit()
+                return {
+                    "status": "FAILED",
+                    "cooked": True,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "message": f"Nhóm [{group_name}] không tồn tại hoặc nội dung bị khóa. Đã tự động cho cook (status=LEFT, enabled=0)."
+                }
+
+            # B. Tài khoản CHƯA GIA NHẬP NHÓM (nút 'Tham gia nhóm' / 'Join group' đang hiển thị)
+            has_join_btn = page.locator("div[aria-label='Tham gia nhóm'], div[aria-label='Join group'], div[role='button']:has-text('Tham gia nhóm'), div[role='button']:has-text('Join group')").count() > 0 or ("tham gia nhóm" in body_lower and "đã tham gia" not in body_lower)
+            if has_join_btn:
+                poster_logger.warning(f"🚫 [CHO COOK]: Nhóm [{group_name}] tài khoản CHƯA GIA NHẬP (chưa được duyệt/chưa join). Đã tự động loại bỏ (status=LEFT, enabled=0)!")
+                self.db.update_group_status(group_id, "LEFT")
+                with self.db.get_connection() as conn:
+                    conn.execute("UPDATE fb_groups SET enabled = 0, posting_restricted = 1, health_verdict = 'NOT_JOINED_COOKED' WHERE group_id = ?", (group_id,))
+                    conn.commit()
+                return {
+                    "status": "FAILED",
+                    "cooked": True,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "message": f"Tài khoản chưa được duyệt / chưa gia nhập nhóm [{group_name}]. Đã tự động cho cook (status=LEFT, enabled=0)."
+                }
+
+            # C. Yêu cầu gia nhập ĐANG BỊ KẸT CHỜ DUYỆT (nút 'Hủy yêu cầu' / 'Cancel request' / 'Đang chờ')
+            has_cancel_btn = page.locator("div[aria-label='Hủy yêu cầu'], div[aria-label='Cancel request'], div[role='button']:has-text('Hủy yêu cầu'), div[role='button']:has-text('Cancel request')").count() > 0 or "hủy yêu cầu" in body_lower
+            if has_cancel_btn:
+                poster_logger.warning(f"🚫 [CHO COOK]: Nhóm [{group_name}] yêu cầu tham gia ĐANG BỊ KẸT CHỜ DUYỆT. Đang tự động hủy yêu cầu và cho cook...")
+                try:
+                    self.feedback_monitor.cancel_pending_request(page)
+                except Exception:
+                    pass
+                self.db.update_group_status(group_id, "LEFT")
+                with self.db.get_connection() as conn:
+                    conn.execute("UPDATE fb_groups SET enabled = 0, posting_restricted = 1, health_verdict = 'PENDING_JOIN_COOKED' WHERE group_id = ?", (group_id,))
+                    conn.commit()
+                return {
+                    "status": "FAILED",
+                    "cooked": True,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "message": f"Yêu cầu tham gia nhóm [{group_name}] bị kẹt chờ duyệt. Đã tự động hủy yêu cầu và cho cook (status=LEFT, enabled=0)."
+                }
+
+            # D. Nhóm CHỈ CHO ADMIN ĐĂNG BÀI hoặc tài khoản bị hạn chế quyền đăng
+            is_admin_only = any(term in body_lower for term in [
+                "chỉ quản trị viên mới có thể đăng bài",
+                "chỉ quản trị viên mới có quyền đăng",
+                "only admins can post",
+                "bạn đã bị hạn chế đăng bài",
+                "bạn không thể đăng bài",
+                "quyền đăng bài của bạn đã bị tạm dừng",
+                "nhóm này hiện không chấp nhận bài viết mới"
+            ])
+            if is_admin_only:
+                poster_logger.warning(f"🚫 [CHO COOK]: Nhóm [{group_name}] CHỈ CHO ADMIN ĐĂNG BÀI hoặc hạn chế thành viên. Đang tự động rời nhóm và cho cook...")
+                try:
+                    self.feedback_monitor.leave_group(group_url, page=page)
+                except Exception:
+                    pass
+                self.db.update_group_status(group_id, "LEFT")
+                with self.db.get_connection() as conn:
+                    conn.execute("UPDATE fb_groups SET enabled = 0, posting_restricted = 1, health_verdict = 'ADMIN_ONLY_COOKED' WHERE group_id = ?", (group_id,))
+                    conn.commit()
+                return {
+                    "status": "FAILED",
+                    "cooked": True,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "message": f"Nhóm [{group_name}] chỉ cho phép Quản trị viên đăng bài. Đã tự động out nhóm và cho cook (status=LEFT, enabled=0)."
+                }
+
             # 1. Tìm nút bấm kích hoạt khung tạo bài viết
             trigger_selectors = [
                 "div[role='button']:has-text('Bạn viết gì đi')",
@@ -315,12 +387,26 @@ class FacebookGroupPoster:
                     poster_logger.debug(f"Bỏ qua selector '{sel}' do lỗi cú pháp/tìm kiếm: {sel_err}")
 
             if not trigger:
-                poster_logger.warning(f"⚠️ Không tìm thấy khung tạo bài viết trong nhóm [{group_name}]. Có thể nhóm cấm đăng bài hoặc yêu cầu quyền Admin.")
+                poster_logger.warning(
+                    f"⚠️ Không tìm thấy khung tạo bài viết trong nhóm [{group_name}]. "
+                    f"Nhóm hạn chế quyền đăng hoặc không cho phép thành viên đăng bài. Đang tự động rời nhóm và cho cook..."
+                )
+                try:
+                    self.feedback_monitor.leave_group(group_url, page=page)
+                except Exception as e_leave:
+                    poster_logger.debug(f"Lỗi khi out nhóm: {e_leave}")
+
+                self.db.update_group_status(group_id, "LEFT")
+                with self.db.get_connection() as conn:
+                    conn.execute("UPDATE fb_groups SET enabled = 0, posting_restricted = 1, health_verdict = 'NO_POST_BUTTON_COOKED' WHERE group_id = ?", (group_id,))
+                    conn.commit()
+
                 return {
                     "status": "FAILED",
+                    "cooked": True,
                     "group_id": group_id,
                     "group_name": group_name,
-                    "message": "Không tìm thấy nút tạo bài viết (nhóm hạn chế quyền đăng thành viên hoặc cần phê duyệt)."
+                    "message": f"Không tìm thấy nút tạo bài viết (nhóm hạn chế quyền đăng hoặc chưa được duyệt). Đã tự động out nhóm [{group_name}] và cho cook (status=LEFT, enabled=0)."
                 }
 
             # Bấm mở popup Tạo bài viết
@@ -498,6 +584,35 @@ class FacebookGroupPoster:
                 content_hash=meta.get("content_hash", "")
             )
 
+            # Đồng bộ vào bảng post_history phục vụ PostApprovalMonitor kiểm tra duyệt
+            try:
+                with self.db.get_connection() as conn:
+                    conn.execute("""
+                        INSERT INTO post_history (
+                            target_type, target_id, deal_id, content, status, approval_status,
+                            post_url, template_id, content_hash
+                        ) VALUES ('FB_GROUP', ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        str(group_id),
+                        str(deal.get("item_id", "")) if deal else "",
+                        post_content,
+                        post_status,
+                        "PENDING" if is_pending else "APPROVED",
+                        target_post_url,
+                        meta.get("template_id", ""),
+                        meta.get("content_hash", "")
+                    ))
+                    if is_pending:
+                        conn.execute("""
+                            UPDATE fb_groups 
+                            SET requires_post_approval = 1,
+                                pending_approval_count = COALESCE(pending_approval_count, 0) + 1
+                            WHERE group_id = ?
+                        """, (str(group_id),))
+                    conn.commit()
+            except Exception as e_ph:
+                poster_logger.warning(f"Lỗi ghi post_history: {e_ph}")
+
             # Cập nhật số bài đã đăng trong ngày cho tài khoản và kích hoạt Cooldown
             if acc_id:
                 try:
@@ -588,12 +703,13 @@ class FacebookGroupPoster:
         min_delay_seconds: int = 180,
         max_delay_seconds: int = 360,
         group_ids: Optional[List[str]] = None,
-        delay_seconds: Optional[int] = None
+        delay_seconds: Optional[int] = None,
+        account_id: Optional[object] = None
     ) -> List[Dict]:
         """
         Chu trình đăng bài dần dần/tuần tự vào các nhóm Facebook đã tham gia (APPROVED).
         - Hỗ trợ danh sách group_ids cụ thể (khi người dùng chọn tất cả hoặc chọn nhiều nhóm).
-        - Luân phiên đa tài khoản Facebook (Nick 1 -> Nick 2 -> Nick 3) chống bị checkpoint.
+        - Giữ cố định tài khoản đã chọn, hoặc luân phiên nếu yêu cầu rotate.
         - Khoảng nghỉ (nhịp nghỉ) tùy chỉnh giữa các bài đăng với bộ đếm ngược thời gian thực.
         """
         global gradual_posting_state
@@ -643,22 +759,34 @@ class FacebookGroupPoster:
             gradual_posting_state["status"] = "NO_GROUPS"
             return []
 
+        # Xác định tài khoản cố định nếu người dùng đã chỉ định
+        fixed_account = None
+        if account_id is not None and str(account_id).strip() != "" and str(account_id).strip().lower() != "rotate":
+            from modules.outreach.fb_account_manager import resolve_fb_account
+            fixed_account, _, _ = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
+            if fixed_account:
+                poster_logger.info(f"👤 Cố định tài khoản Facebook theo người dùng chọn: [{fixed_account.get('name')}] (Không tự ý đổi nick)")
+
         results = []
         for idx, group in enumerate(groups, 1):
             group_id = str(group["group_id"])
             group_name = group.get("name", group_id)
 
-            # Lấy nick luân phiên tiếp theo
-            acc, acc_msg = self.account_mgr.get_next_account(task_type="POST")
-            cur_acc_name = acc.get("name", "Nick Mặc Định") if acc else "Chưa cấu hình"
+            if fixed_account:
+                acc = fixed_account
+                cur_acc_name = acc.get("name", "Nick FB")
+            else:
+                acc, acc_msg = self.account_mgr.get_next_account(task_type="POST")
+                cur_acc_name = acc.get("name", "Nick Mặc Định") if acc else "Chưa cấu hình"
+                if not acc:
+                    poster_logger.warning(f"⚠️ {acc_msg}")
+
             gradual_posting_state["current_group"] = f"{group_name} ({cur_acc_name})"
             gradual_posting_state["current_account"] = cur_acc_name
 
             poster_logger.info(f"\n--- Tiến trình [{idx}/{len(groups)}]: Đăng bài vào nhóm [{group_name}] bằng tài khoản [{cur_acc_name}] ---")
-            if not acc:
-                poster_logger.warning(f"⚠️ {acc_msg}")
-
             res = self.post_to_single_group(group_id, deal_id=None, account=acc)
+
             results.append(res)
             gradual_posting_state["completed"] += 1
             gradual_posting_state["last_result"] = res

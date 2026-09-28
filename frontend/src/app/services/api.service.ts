@@ -78,20 +78,32 @@ export class ApiService {
     return this.http.delete<any>(`${this.baseUrl}/groups/${id}`);
   }
 
-  leaveFbGroup(groupUrl: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/groups/leave`, { group_url: groupUrl });
+  leaveFbGroup(groupUrl: string, accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/leave`, { group_url: groupUrl, account_id: accountId });
   }
 
-  checkGroupHealth(groupUrl: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/groups/check-health`, { group_url: groupUrl });
+  checkGroupHealth(groupUrl: string, accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/check-health`, { group_url: groupUrl, account_id: accountId });
   }
 
-  checkPendingJoin(groupUrl: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/groups/check-pending`, { group_url: groupUrl });
+  checkPendingJoin(groupUrl: string, accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/check-pending`, { group_url: groupUrl, account_id: accountId });
   }
 
-  checkPendingApprovals(): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/groups/posts/check-approvals`, {});
+  checkPendingApprovals(accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/posts/check-approvals`, { account_id: accountId });
+  }
+
+  syncJoinedGroups(accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/sync-joined`, { account_id: accountId });
+  }
+
+  auditAndCleanGroups(liveScan: boolean = true, maxLiveScan: number = 5, accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/audit-and-clean`, { live_scan: liveScan, max_live_scan: maxLiveScan, account_id: accountId });
+  }
+
+  discoverFbGroups(categoryName: string = 'Săn Deal Tổng Hợp', maxGroups: number = 5, accountId?: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/groups/discover`, { category_name: categoryName, max_groups: maxGroups, account_id: accountId });
   }
 
   getGroupQualityMetrics(): Observable<any> {

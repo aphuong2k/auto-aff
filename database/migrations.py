@@ -388,7 +388,9 @@ def init_db(conn: sqlite3.Connection):
         ("avg_engagement", "REAL DEFAULT 0.0"), ("unique_posters", "INTEGER DEFAULT 0"),
         ("join_checked_at", "TIMESTAMP"), ("join_check_count", "INTEGER DEFAULT 0"),
         ("posting_restricted", "INTEGER DEFAULT 0"), ("consecutive_rejections", "INTEGER DEFAULT 0"),
-        ("health_verdict", "TEXT DEFAULT 'UNKNOWN'"), ("last_template_id", "TEXT DEFAULT ''")
+        ("health_verdict", "TEXT DEFAULT 'UNKNOWN'"), ("last_template_id", "TEXT DEFAULT ''"),
+        ("requires_post_approval", "INTEGER DEFAULT 0"), ("pending_approval_count", "INTEGER DEFAULT 0"),
+        ("last_approval_check_at", "TIMESTAMP")
     ]:
         if col not in fb_cols:
             cursor.execute(f"ALTER TABLE fb_groups ADD COLUMN {col} {c_type}")
@@ -409,7 +411,9 @@ def init_db(conn: sqlite3.Connection):
     for col, c_type in [
         ("account_name", "TEXT DEFAULT ''"),
         ("template_id", "TEXT DEFAULT ''"),
-        ("content_hash", "TEXT DEFAULT ''")
+        ("content_hash", "TEXT DEFAULT ''"),
+        ("approval_status", "TEXT DEFAULT 'PENDING'"),
+        ("approval_checked_at", "TIMESTAMP")
     ]:
         if col not in pl_cols:
             cursor.execute(f"ALTER TABLE posted_logs ADD COLUMN {col} {c_type}")

@@ -100,28 +100,35 @@ class GroupRepository(BaseRepository):
                 """, (status, group_id))
             conn.commit()
 
-    def record_group_post_rejection(self, group_id: str, max_consecutive_rejections: int = 3) -> bool:
-        """Ghi nhận bài đăng bị từ chối/không duyệt. Nếu liên tiếp >= max -> hạn chế đăng."""
+    def record_group_post_rejection(self, group_id: str, max_consecutive_rejections: int = 2, reason: str = "REJECTED") -> bool:
+        """Ghi nhận bài đăng bị từ chối hoặc chờ duyệt. Nếu liên tiếp >= max (mặc định 2) -> hạn chế đăng và kích hoạt out group."""
         with self.get_connection() as conn:
-            row = conn.execute("SELECT consecutive_rejections FROM fb_groups WHERE group_id = ?", (group_id,)).fetchone()
+            row = conn.execute("SELECT consecutive_rejections, pending_approval_count FROM fb_groups WHERE group_id = ?", (group_id,)).fetchone()
             current_rej = (row["consecutive_rejections"] or 0) + 1 if row else 1
-            restricted = 1 if current_rej >= max_consecutive_rejections else 0
+            current_pending = ((row["pending_approval_count"] or 0) + (1 if reason == "PENDING" else 0)) if row else 1
+            restricted = 1 if (current_rej >= max_consecutive_rejections or current_pending >= max_consecutive_rejections) else 0
+            requires_approval = 1 if reason == "PENDING" else 0
             conn.execute("""
                 UPDATE fb_groups 
                 SET consecutive_rejections = ?,
-                    posting_restricted = ?
+                    pending_approval_count = ?,
+                    requires_post_approval = CASE WHEN ? = 1 THEN 1 ELSE COALESCE(requires_post_approval, 0) END,
+                    posting_restricted = ?,
+                    last_approval_check_at = CURRENT_TIMESTAMP
                 WHERE group_id = ?
-            """, (current_rej, restricted, group_id))
+            """, (current_rej, current_pending, requires_approval, restricted, group_id))
             conn.commit()
             return restricted == 1
 
     def reset_group_post_rejections(self, group_id: str):
-        """Reset số lần bị từ chối khi bài viết được duyệt thành công"""
+        """Reset số lần bị từ chối / chờ duyệt khi bài viết được duyệt thành công"""
         with self.get_connection() as conn:
             conn.execute("""
                 UPDATE fb_groups 
                 SET consecutive_rejections = 0,
-                    posting_restricted = 0
+                    pending_approval_count = 0,
+                    posting_restricted = 0,
+                    last_approval_check_at = CURRENT_TIMESTAMP
                 WHERE group_id = ?
             """, (group_id,))
             conn.commit()
@@ -154,15 +161,23 @@ class GroupRepository(BaseRepository):
             rows = conn.execute(query, tuple(params)).fetchall()
             return [dict(r) for r in rows]
 
-    def update_post_approval_status(self, post_id: int, status: str):
-        """Cập nhật trạng thái duyệt bài trong lịch sử post_history"""
+    def update_post_approval_status(self, post_id: int, status: str, source_table: str = "post_history"):
+        """Cập nhật trạng thái duyệt bài trong lịch sử post_history hoặc posted_logs"""
         with self.get_connection() as conn:
-            conn.execute("""
-                UPDATE post_history 
-                SET approval_status = ?, 
-                    approval_checked_at = CURRENT_TIMESTAMP 
-                WHERE id = ?
-            """, (status, post_id))
+            if source_table == "posted_logs":
+                conn.execute("""
+                    UPDATE posted_logs 
+                    SET approval_status = ?, 
+                        approval_checked_at = CURRENT_TIMESTAMP 
+                    WHERE id = ?
+                """, (status, post_id))
+            else:
+                conn.execute("""
+                    UPDATE post_history 
+                    SET approval_status = ?, 
+                        approval_checked_at = CURRENT_TIMESTAMP 
+                    WHERE id = ?
+                """, (status, post_id))
             conn.commit()
 
     def is_deal_posted_to_group(self, deal_id: str, group_id: str) -> bool:
@@ -266,31 +281,31 @@ class GroupRepository(BaseRepository):
             return [dict(r) for r in rows]
 
     def seed_default_group_catalog_if_empty(self):
-        """Bổ sung danh mục nhóm mẫu nếu CSDL có ít hơn 5 nhóm"""
+        """Bổ sung danh mục nhóm mẫu nếu CSDL hoàn toàn trống (mặc định tắt enabled=0 để không gây lỗi đăng bài)"""
         with self.get_connection() as conn:
             conn.execute("UPDATE fb_groups SET category_name = 'Thời Trang Nữ' WHERE group_id = '1027765188537633'")
             conn.execute("UPDATE fb_groups SET category_name = 'Thiết Bị Điện Tử' WHERE group_id = 'congdongandroidvietnam'")
             conn.commit()
 
             count = conn.execute("SELECT COUNT(*) as c FROM fb_groups").fetchone()["c"]
-            if count < 5:
+            if count == 0:
                 sample_groups = [
-                    ("grp_men_01", "Góc Phối Đồ Nam & Pass Đồ Chuẩn", "https://www.facebook.com/groups/phoidonamdep/", "Thời Trang Nam", 28500, "APPROVED"),
-                    ("grp_men_02", "Hội Mặc Đẹp & Săn Sale Đồ Nam Shopee", "https://www.facebook.com/groups/sansaledonam/", "Thời Trang Nam", 19200, "APPROVED"),
-                    ("grp_women_01", "Hội Chị Em Mê Váy Xinh & Shopee Haul", "https://www.facebook.com/groups/chiemvayxinh/", "Thời Trang Nữ", 45000, "APPROVED"),
-                    ("grp_women_02", "Góc Pass Đồ & Review Quần Áo Nữ Shopee", "https://www.facebook.com/groups/passdonudep/", "Thời Trang Nữ", 32100, "APPROVED"),
-                    ("grp_tech_01", "Hội Review Phụ Kiện Điện Thoại & Cáp Sạc Tai Nghe", "https://www.facebook.com/groups/phukiencaploatai/", "Thiết Bị Điện Tử", 52000, "APPROVED"),
-                    ("grp_tech_02", "Cộng Đồng Góc Máy Đẹp & Setup Bàn Làm Việc", "https://www.facebook.com/groups/setupbanlamviec/", "Thiết Bị Điện Tử", 68000, "APPROVED"),
-                    ("grp_home_01", "Hội Nghiện Nhà & Review Đồ Gia Dụng Thông Minh", "https://www.facebook.com/groups/nghiennhagiadung/", "Thiết Bị Điện Gia Dụng", 85000, "APPROVED"),
-                    ("grp_home_02", "Yêu Bếp & Mẹo Sắm Nồi Chiên Không Dầu Chảo Bếp", "https://www.facebook.com/groups/yeubepticnhi/", "Thiết Bị Điện Gia Dụng", 41000, "APPROVED"),
-                    ("grp_deal_01", "Hội Săn Deal Shopee 1K & Mã Freeship 0Đ VIP", "https://www.facebook.com/groups/sansaleshopee1k/", "Săn Deal Tổng Hợp", 125000, "APPROVED"),
-                    ("grp_deal_02", "Cộng Đồng Săn Mã Giảm Giá & Canh Giờ Vàng Back Mã", "https://www.facebook.com/groups/canhmagiamgia/", "Săn Deal Tổng Hợp", 94000, "APPROVED")
+                    ("grp_men_01", "Góc Phối Đồ Nam & Pass Đồ Chuẩn", "https://www.facebook.com/groups/phoidonamdep/", "Thời Trang Nam", 28500, "LEFT"),
+                    ("grp_men_02", "Hội Mặc Đẹp & Săn Sale Đồ Nam Shopee", "https://www.facebook.com/groups/sansaledonam/", "Thời Trang Nam", 19200, "LEFT"),
+                    ("grp_women_01", "Hội Chị Em Mê Váy Xinh & Shopee Haul", "https://www.facebook.com/groups/chiemvayxinh/", "Thời Trang Nữ", 45000, "LEFT"),
+                    ("grp_women_02", "Góc Pass Đồ & Review Quần Áo Nữ Shopee", "https://www.facebook.com/groups/passdonudep/", "Thời Trang Nữ", 32100, "LEFT"),
+                    ("grp_tech_01", "Hội Review Phụ Kiện Điện Thoại & Cáp Sạc Tai Nghe", "https://www.facebook.com/groups/phukiencaploatai/", "Thiết Bị Điện Tử", 52000, "LEFT"),
+                    ("grp_tech_02", "Cộng Đồng Góc Máy Đẹp & Setup Bàn Làm Việc", "https://www.facebook.com/groups/setupbanlamviec/", "Thiết Bị Điện Tử", 68000, "LEFT"),
+                    ("grp_home_01", "Hội Nghiện Nhà & Review Đồ Gia Dụng Thông Minh", "https://www.facebook.com/groups/nghiennhagiadung/", "Thiết Bị Điện Gia Dụng", 85000, "LEFT"),
+                    ("grp_home_02", "Yêu Bếp & Mẹo Sắm Nồi Chiên Không Dầu Chảo Bếp", "https://www.facebook.com/groups/yeubepticnhi/", "Thiết Bị Điện Gia Dụng", 41000, "LEFT"),
+                    ("grp_deal_01", "Hội Săn Deal Shopee 1K & Mã Freeship 0Đ VIP", "https://www.facebook.com/groups/sansaleshopee1k/", "Săn Deal Tổng Hợp", 125000, "LEFT"),
+                    ("grp_deal_02", "Cộng Đồng Săn Mã Giảm Giá & Canh Giờ Vàng Back Mã", "https://www.facebook.com/groups/canhmagiamgia/", "Săn Deal Tổng Hợp", 94000, "LEFT")
                 ]
 
                 for gid, name, url, cat, mems, status in sample_groups:
                     conn.execute("""
-                        INSERT OR IGNORE INTO fb_groups (group_id, name, url, category_name, members_count, status, priority, enabled)
-                        VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+                        INSERT OR IGNORE INTO fb_groups (group_id, name, url, category_name, members_count, status, priority, enabled, posting_restricted)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, 0, 1)
                     """, (gid, name, url, cat, mems, status))
                 conn.commit()
 
@@ -410,17 +425,37 @@ class GroupRepository(BaseRepository):
             conn.commit()
             return cursor.lastrowid
 
-    def get_group_last_template_id(self, group_id: str) -> str:
+    def get_group_last_template_id(self, group_id: str, group_name: str = "") -> str:
         """Lấy template_id đã dùng gần nhất cho nhóm để thực hiện xoay vòng template"""
         with self.get_connection() as conn:
-            row = conn.execute("SELECT last_template_id FROM fb_groups WHERE group_id = ? OR id = ?", (str(group_id), str(group_id))).fetchone()
-            return row["last_template_id"] if row and row["last_template_id"] else ""
+            try:
+                row = conn.execute("SELECT last_template_id FROM fb_groups WHERE group_id = ?", (str(group_id),)).fetchone()
+                if row and row["last_template_id"]:
+                    return row["last_template_id"]
+            except Exception:
+                pass
+            # Fallback lấy từ posted_logs theo group_name hoặc group_url
+            try:
+                p_row = conn.execute("""
+                    SELECT template_id FROM posted_logs 
+                    WHERE (group_url LIKE ? OR target_url LIKE ? OR group_name = ?) 
+                      AND template_id IS NOT NULL AND template_id != ''
+                    ORDER BY id DESC LIMIT 1
+                """, (f"%{group_id}%", f"%{group_id}%", group_name)).fetchone()
+                if p_row and p_row["template_id"]:
+                    return p_row["template_id"]
+            except Exception:
+                pass
+            return ""
 
     def update_group_last_template_id(self, group_id: str, template_id: str):
         """Cập nhật template_id gần nhất đã dùng cho nhóm"""
         with self.get_connection() as conn:
-            conn.execute("UPDATE fb_groups SET last_template_id = ? WHERE group_id = ? OR id = ?", (template_id, str(group_id), str(group_id)))
-            conn.commit()
+            try:
+                conn.execute("UPDATE fb_groups SET last_template_id = ? WHERE group_id = ?", (template_id, str(group_id)))
+                conn.commit()
+            except Exception:
+                pass
 
     def get_recent_post_contents_for_group(self, group_name: str, limit: int = 10) -> List[str]:
         """Lấy các nội dung bài đăng gần đây của nhóm để kiểm tra độ trùng lặp"""

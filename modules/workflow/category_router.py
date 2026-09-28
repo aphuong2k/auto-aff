@@ -1,3 +1,4 @@
+import random
 import logging
 from typing import Dict, List, Optional, Tuple
 from database.db_manager import DatabaseManager
@@ -71,11 +72,12 @@ class CategoryRouter:
             )
             return None, "SKIPPED_ALL_POSTED", evaluated_count
 
-        # Chọn deal có điểm số cao nhất chưa từng đăng lên nhóm này
-        best_deal = unposted_deals[0]
+        # Chọn ngẫu nhiên từ top deal chất lượng cao nhất chưa từng đăng lên nhóm này (tránh lặp lại 1 deal duy nhất)
+        candidates_pool = unposted_deals[:min(10, len(unposted_deals))]
+        best_deal = random.choice(candidates_pool)
         router_logger.info(
-            f"🎯 [ROUTER KHỚP DEAL]: Nhóm [{group_name}] ({group_cat}) "
-            f"-> Chọn deal: [{best_deal.get('name')[:35]}...] (Score: {best_deal.get('deal_score')}, Giá: {int(best_deal.get('price_sale', 0)):,}đ)"
+            f"🎯 [ROUTER KHỚP DEAL RANDOM]: Nhóm [{group_name}] ({group_cat}) "
+            f"-> Chọn deal ngẫu nhiên: [{best_deal.get('name')[:35]}...] (Score: {best_deal.get('deal_score')}, Giá: {int(best_deal.get('price_sale', 0)):,}đ)"
         )
 
         return best_deal, "QUALIFIED", evaluated_count

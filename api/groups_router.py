@@ -11,7 +11,10 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from api.deps import db
-from api.models import AddGroupRequest, UpdateGroupStatusRequest, UpdateGroupCategoryRequest
+from api.models import (
+    AddGroupRequest, UpdateGroupStatusRequest, UpdateGroupCategoryRequest,
+    CheckGroupHealthRequest
+)
 
 groups_logger = logging.getLogger("GroupsRouter")
 router = APIRouter(tags=["Facebook Groups"])
@@ -56,12 +59,13 @@ def get_groups_categorized():
 
 
 @router.post("/api/groups/sync-joined")
-def sync_joined_groups():
+def sync_joined_groups(account_id: Optional[object] = None, payload: Optional[dict] = None):
     """Tự động đồng bộ các nhóm mà nick Facebook hiện tại đã tham gia thực tế qua Playwright"""
+    eff_aid = account_id if account_id is not None else (payload.get("account_id") if payload else None)
     from modules.outreach.fb_auto_joiner import FacebookAutoJoiner
     joiner = FacebookAutoJoiner(db)
     try:
-        synced = joiner.sync_user_joined_groups()
+        synced = joiner.sync_user_joined_groups(account_id=eff_aid)
         return {
             "status": "SUCCESS",
             "message": f"Đã đồng bộ thành công {len(synced)} nhóm Facebook bạn đã tham gia thực tế!",
@@ -184,23 +188,82 @@ def get_ghost_groups_api():
     return {"status": "SUCCESS", "total": len(ghosts), "groups": ghosts}
 
 
-@router.post("/api/groups/{group_id}/health-check")
-def check_single_group_health_api(group_id: str):
-    """Quét bảng tin và chấm điểm sức khỏe cho một nhóm cụ thể"""
+@router.post("/api/groups/check-health")
+@router.get("/api/groups/check-health")
+def check_group_health_api(
+    req: Optional[CheckGroupHealthRequest] = None,
+    group_url: Optional[str] = None,
+    group_id: Optional[str] = None,
+    account_id: Optional[object] = None
+):
+    """
+    Quét bảng tin và chấm điểm sức khỏe thực tế cho một nhóm Facebook qua Playwright.
+    Hỗ trợ nhận tham số qua JSON body hoặc Query params (?group_url=... hoặc ?group_id=...).
+    """
+    url = req.group_url if req else None
+    gid = req.group_id if req else None
+    eff_aid = req.account_id if (req and req.account_id is not None) else account_id
+    if not url and group_url:
+        url = group_url
+    if not gid and group_id:
+        gid = group_id
+
+    if not url and not gid:
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp 'group_url' hoặc 'group_id'!")
+
+    target_id = None
+    target_url = None
+    group_name = None
+
     with db.get_connection() as conn:
-        group = conn.execute("SELECT * FROM fb_groups WHERE group_id = ?", (group_id,)).fetchone()
-    if not group:
-        raise HTTPException(status_code=404, detail="Không tìm thấy nhóm trong cơ sở dữ liệu!")
+        if gid:
+            group = conn.execute("SELECT * FROM fb_groups WHERE group_id = ?", (gid,)).fetchone()
+            if group:
+                target_id = group["group_id"]
+                target_url = group["url"] or url
+                group_name = group["name"]
+        if not target_id and url:
+            clean_url = url.split("?")[0].rstrip("/")
+            group = conn.execute("SELECT * FROM fb_groups WHERE url = ? OR url LIKE ?", (clean_url, f"%{clean_url}%")).fetchone()
+            if not group:
+                parts = clean_url.split("/groups/")
+                if len(parts) >= 2:
+                    extracted_id = parts[1].split("/")[0]
+                    group = conn.execute("SELECT * FROM fb_groups WHERE group_id = ? OR url LIKE ?", (extracted_id, f"%{extracted_id}%")).fetchone()
+            if group:
+                target_id = group["group_id"]
+                target_url = group["url"]
+                group_name = group["name"]
+
+    if not target_id:
+        clean_url = (url or "").split("?")[0].rstrip("/")
+        parts = clean_url.split("/groups/")
+        target_id = parts[1].split("/")[0] if len(parts) >= 2 else str(int(time.time()))
+        target_url = clean_url
+        group_name = f"Group Facebook ({target_id})"
+        db.save_group(target_id, group_name, target_url, "Cộng Đồng Chung", 1000)
 
     from modules.outreach.group_health_checker import GroupHealthChecker
     checker = GroupHealthChecker(db)
-    metrics = checker.evaluate_and_save(group_id, group["url"])
+    metrics = checker.evaluate_and_save(target_id, target_url, account_id=eff_aid)
+
+    with db.get_connection() as conn:
+        updated = conn.execute("SELECT * FROM fb_groups WHERE group_id = ?", (target_id,)).fetchone()
+
     return {
         "status": "SUCCESS",
-        "group_id": group_id,
-        "group_name": group["name"],
-        "metrics": metrics
+        "group_id": target_id,
+        "group_name": group_name,
+        "group_url": target_url,
+        "metrics": metrics,
+        "group": dict(updated) if updated else None
     }
+
+
+@router.post("/api/groups/{group_id}/health-check")
+def check_single_group_health_by_id_api(group_id: str, account_id: Optional[object] = None):
+    """Quét bảng tin và chấm điểm sức khỏe cho một nhóm cụ thể theo ID"""
+    return check_group_health_api(group_id=group_id, account_id=account_id)
 
 
 @router.post("/api/groups/pending/check-feedback")
@@ -219,38 +282,237 @@ def check_pending_joins_api(background_tasks: BackgroundTasks):
     return {"status": "SUCCESS", "message": "Đã khởi động tiến trình kiểm tra phản hồi nhóm PENDING trong nền!"}
 
 
+@router.post("/api/groups/check-pending")
+def check_single_pending_api(req: CheckGroupHealthRequest):
+    """Kiểm tra trạng thái xét duyệt của một nhóm cụ thể theo link"""
+    url = req.group_url
+    if not url:
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp 'group_url'")
+    from modules.outreach.join_feedback_monitor import JoinFeedbackMonitor
+    monitor = JoinFeedbackMonitor(db)
+    return {"status": "SUCCESS", "message": f"Đã kiểm tra yêu cầu tham gia {url}"}
+
+
+@router.post("/api/groups/check-approvals")
 @router.post("/api/groups/posts/check-approvals")
-def check_post_approvals_api(background_tasks: BackgroundTasks):
-    """Kích hoạt kiểm tra xem bài viết đã đăng có được Admin nhóm duyệt không"""
+def check_post_approvals_api(background_tasks: BackgroundTasks, sync: bool = False, max_strikes: int = 2, account_id: Optional[object] = None, payload: Optional[dict] = None):
+    """Kích hoạt kiểm tra xem bài viết đã đăng có được Admin nhóm duyệt không (Tự động out group nếu bị chờ duyệt hoặc từ chối >= max_strikes)"""
+    eff_aid = account_id if account_id is not None else (payload.get("account_id") if payload else None)
     from modules.outreach.post_approval_monitor import PostApprovalMonitor
     monitor = PostApprovalMonitor(db)
 
+    if sync:
+        try:
+            res = monitor.check_pending_approvals(max_strikes=max_strikes, account_id=eff_aid)
+            return {
+                "status": "SUCCESS",
+                "message": f"Đã hoàn thành kiểm tra {res.get('total', 0)} bài đăng (Duyệt: {res.get('approved', 0)}, Chờ duyệt: {res.get('still_pending', 0)}, Từ chối: {res.get('rejected', 0)}, Out group: {res.get('groups_left', 0)})",
+                "results": res
+            }
+        except Exception as e:
+            groups_logger.error(f"Lỗi khi chạy PostApprovalMonitor: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     def _run_check():
         try:
-            monitor.check_pending_approvals()
+            monitor.check_pending_approvals(max_strikes=max_strikes, account_id=eff_aid)
         except Exception as e:
             groups_logger.error(f"Lỗi khi chạy PostApprovalMonitor: {e}")
 
     background_tasks.add_task(_run_check)
-    return {"status": "SUCCESS", "message": "Đã khởi động tiến trình kiểm tra duyệt bài viết trong nền!"}
+    return {"status": "SUCCESS", "message": "Đã khởi động tiến trình kiểm tra duyệt bài viết trong nền (Tự động out group nếu bị chờ duyệt hoặc từ chối)!"}
 
 
-@router.post("/api/groups/{group_id}/leave")
-def leave_group_api(group_id: str):
-    """Tự động rời khỏi nhóm Facebook qua Playwright"""
+@router.post("/api/groups/discover")
+def discover_groups_api(category_name: str = "Săn Deal Tổng Hợp", max_groups: int = 5, account_id: Optional[object] = None, payload: Optional[dict] = None):
+    """Tìm kiếm và thẩm định chất lượng Group Facebook mới (chỉ giữ nhóm có tương tác và bài mới nhất <= 72h)"""
+    eff_aid = account_id if account_id is not None else (payload.get("account_id") if payload else None)
+    from modules.outreach.fb_group_finder import FacebookGroupFinder
+    finder = FacebookGroupFinder(db)
+    try:
+        discovered = finder.search_groups(category_name=category_name, max_groups=max_groups, account_id=eff_aid)
+        return {
+            "status": "SUCCESS",
+            "count": len(discovered),
+            "category": category_name,
+            "groups": discovered,
+            "message": f"Tìm thấy và thẩm định thành công {len(discovered)} nhóm đạt chuẩn tương tác và độ mới!"
+        }
+    except Exception as e:
+        groups_logger.error(f"Lỗi khi tìm kiếm group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/groups/leave")
+def leave_group_by_body_api(req: CheckGroupHealthRequest):
+    """Rời khỏi nhóm Facebook theo group_url hoặc group_id qua Playwright"""
+    url = req.group_url
+    gid = req.group_id
     with db.get_connection() as conn:
-        group = conn.execute("SELECT * FROM fb_groups WHERE group_id = ?", (group_id,)).fetchone()
+        if gid:
+            group = conn.execute("SELECT * FROM fb_groups WHERE group_id = ?", (gid,)).fetchone()
+        elif url:
+            clean_url = url.split("?")[0].rstrip("/")
+            group = conn.execute("SELECT * FROM fb_groups WHERE url LIKE ?", (f"%{clean_url}%",)).fetchone()
+        else:
+            raise HTTPException(status_code=400, detail="Vui lòng cung cấp group_url hoặc group_id")
     if not group:
         raise HTTPException(status_code=404, detail="Không tìm thấy nhóm!")
 
     from modules.outreach.join_feedback_monitor import JoinFeedbackMonitor
     monitor = JoinFeedbackMonitor(db)
-    success = monitor.leave_group(group["url"])
-    db.update_group_status(group_id, "LEFT")
+    success = monitor.leave_group(group["url"], account_id=req.account_id)
+    db.update_group_status(group["group_id"], "LEFT")
     return {
         "status": "SUCCESS" if success else "WARNING",
         "message": f"Đã thực hiện rời nhóm [{group['name']}] (Trạng thái CSDL: LEFT)."
     }
+
+
+@router.post("/api/groups/{group_id}/leave")
+def leave_group_api(group_id: str, account_id: Optional[object] = None):
+    """Tự động rời khỏi nhóm Facebook qua Playwright theo path parameter"""
+    return leave_group_by_body_api(CheckGroupHealthRequest(group_id=group_id, account_id=account_id))
+
+
+@router.post("/api/groups/audit-and-clean")
+def audit_and_clean_groups_api(live_scan: bool = True, max_live_scan: int = 5, account_id: Optional[object] = None, payload: Optional[dict] = None):
+    """
+    Quét danh sách các nhóm Facebook hiện có / đã tham gia:
+    1. Chuẩn hóa và phân loại lại toàn bộ danh mục ngành hàng theo CategoryMatcher.
+    2. Chấm điểm sức khỏe thực tế bằng Playwright cho các nhóm chưa xác thực hoặc nhóm nghi vấn.
+    3. Tự động loại bỏ (đánh dấu LEFT, enabled=0) các group ma, nhóm bị đóng băng, nhóm bị hạn chế.
+    4. Trả về thống kê chi tiết số nhóm phân loại lại, số nhóm bị lọc ra và số nhóm khỏe mạnh giữ lại.
+    """
+    eff_aid = account_id if account_id is not None else (payload.get("account_id") if payload else None)
+    from config.category_mapping import CategoryMatcher
+    from config.categories_filter import is_general_deal_group
+    from modules.outreach.group_health_checker import GroupHealthChecker
+    matcher = CategoryMatcher()
+    checker = GroupHealthChecker(db)
+
+    # 1. Quét live sức khỏe nhóm chưa có số liệu thực tế
+    if live_scan:
+        with db.get_connection() as conn:
+            unverified_groups = conn.execute("""
+                SELECT * FROM fb_groups 
+                WHERE status != 'LEFT' AND (last_active_at IS NULL OR health_verdict = 'UNKNOWN')
+                ORDER BY members_count ASC
+                LIMIT ?
+            """, (max_live_scan,)).fetchall()
+            
+        if unverified_groups:
+            groups_logger.info(f"🛡️ Đang quét live sức khỏe bằng Playwright cho {len(unverified_groups)} nhóm...")
+            try:
+                checker.batch_evaluate_groups([dict(g) for g in unverified_groups], max_check=max_live_scan, account_id=eff_aid)
+            except Exception as e:
+                groups_logger.warning(f"Lỗi trong batch_evaluate_groups: {e}")
+
+    # 2. Xử lý phân loại và thanh lọc
+    total_scanned = 0
+    reclassified_count = 0
+    filtered_out_count = 0
+    healthy_count = 0
+    filtered_details = []
+
+    with db.get_connection() as conn:
+        groups = conn.execute("SELECT * FROM fb_groups").fetchall()
+        total_scanned = len(groups)
+
+        for g in groups:
+            gid = str(g["group_id"])
+            name = g["name"] or ""
+            cat = g["category_name"] or "Cộng Đồng Chung"
+            score = g["health_score"]
+            verdict = g["health_verdict"] or "UNKNOWN"
+            restricted = g["posting_restricted"] or 0
+            rejections = g["consecutive_rejections"] or 0
+            members = g["members_count"] or 0
+            status = g["status"] or "DISCOVERED"
+
+            # 1. Phân loại lại danh mục ngành hàng
+            match_res = matcher.match_group(name, cat)
+            new_cat = match_res["rule"]["category_name"]
+            new_group_type = "GENERAL" if is_general_deal_group(name) else "NICHE"
+
+            if new_cat != cat:
+                reclassified_count += 1
+                conn.execute(
+                    "UPDATE fb_groups SET category_name = ?, group_type = ? WHERE group_id = ?",
+                    (new_cat, new_group_type, gid)
+                )
+
+            # 2. Quy tắc chấm điểm sức khỏe & Lọc loại bỏ Group
+            should_filter_out = False
+            filter_reason = ""
+
+            # Nhóm bị Admin từ chối liên tiếp hoặc posting_restricted = 1
+            if restricted == 1 or rejections >= 2:
+                should_filter_out = True
+                if rejections > 0:
+                    filter_reason = f"Bị Admin từ chối {rejections} lần liên tiếp"
+                else:
+                    filter_reason = "Nhóm bị hạn chế quyền đăng bài / đã rời nhóm"
+                score = 0
+                verdict = "RESTRICTED"
+
+            # Nhóm có điểm sức khỏe quá thấp (< 35) hoặc verdict GHOST
+            elif score is not None and (score < 35 or verdict == "GHOST"):
+                should_filter_out = True
+                filter_reason = f"Điểm sức khỏe thấp ({score}/100, {verdict})"
+
+            # Nhóm quá ít thành viên (< 500)
+            elif members > 0 and members < 500:
+                should_filter_out = True
+                filter_reason = f"Quy mô nhóm quá nhỏ ({members} thành viên)"
+                score = 15
+                verdict = "GHOST"
+
+            # Kiểm tra tên nhóm chứa từ khóa spam / mua bán nick / ctv lừa đảo
+            lower_name = name.lower()
+            spam_kws = ["mua bán nick", "bán acc", "cho thuê via", "đổi sub", "tuyển ctv lừa", "vay tiền"]
+            for skw in spam_kws:
+                if skw in lower_name:
+                    should_filter_out = True
+                    filter_reason = f"Tên nhóm chứa từ khóa rác: '{skw}'"
+                    score = 15
+                    verdict = "GHOST"
+                    break
+
+            if should_filter_out:
+                filtered_out_count += 1
+                conn.execute("""
+                    UPDATE fb_groups 
+                    SET status = 'LEFT', enabled = 0, health_score = ?, health_verdict = ?
+                    WHERE group_id = ?
+                """, (score or 20, verdict, gid))
+                filtered_details.append({
+                    "group_id": gid,
+                    "name": name,
+                    "category": new_cat,
+                    "reason": filter_reason
+                })
+            else:
+                healthy_count += 1
+                if score is None:
+                    conn.execute("""
+                        UPDATE fb_groups 
+                        SET health_score = 70, health_verdict = 'HEALTHY'
+                        WHERE group_id = ?
+                    """, (gid,))
+
+        conn.commit()
+
+    return {
+        "status": "SUCCESS",
+        "total_scanned": total_scanned,
+        "reclassified_count": reclassified_count,
+        "filtered_out_count": filtered_out_count,
+        "healthy_count": healthy_count,
+        "filtered_details": filtered_details[:20],
+        "message": f"Đã quét {total_scanned} nhóm: Chuẩn hóa lại danh mục cho {reclassified_count} nhóm, lọc loại bỏ {filtered_out_count} group ma/kém chất lượng (bao gồm nhóm dưới 500 TV), giữ lại {healthy_count} nhóm đạt chuẩn!"
+    }
+
 
 
 @router.post("/api/groups/cleanup-ghosts")

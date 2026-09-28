@@ -230,10 +230,11 @@ def delete_posted_log(log_id: int):
 # --- Đăng Bài Nhóm (Group Poster & Gradual Posting) ---
 
 @router.post("/api/outreach/post-to-group")
+@router.post("/api/groups/post-single")
 def post_single_group_api(req: SingleGroupPostRequest):
     from modules.outreach.fb_group_poster import FacebookGroupPoster
     poster = FacebookGroupPoster(db)
-    res = poster.post_to_single_group(req.group_id, req.deal_id)
+    res = poster.post_to_single_group(req.group_id, req.deal_id, account_id=req.account_id)
     if res.get("status") == "ERROR":
         raise HTTPException(status_code=500, detail=res.get("message", "Lỗi khi đăng bài"))
     elif res.get("status") == "COOLDOWN_ACTIVE":
@@ -244,6 +245,7 @@ def post_single_group_api(req: SingleGroupPostRequest):
 
 
 @router.post("/api/outreach/start-gradual-posting")
+@router.post("/api/groups/start-gradual-posting")
 def start_gradual_posting_api(req: GradualPostRequest):
     from modules.outreach.fb_group_poster import FacebookGroupPoster, gradual_posting_state
     if gradual_posting_state.get("is_running"):
@@ -263,7 +265,8 @@ def start_gradual_posting_api(req: GradualPostRequest):
                 min_delay_seconds=eff_min,
                 max_delay_seconds=eff_max,
                 group_ids=req.group_ids,
-                delay_seconds=eff_delay
+                delay_seconds=eff_delay,
+                account_id=req.account_id
             )
         except Exception as e:
             gradual_posting_state["is_running"] = False
@@ -383,7 +386,8 @@ def publish_voucher_post(req: PublishPromoPostModel):
         poster = FacebookGroupPoster(db)
         res = poster.post_to_single_group(
             group_id=req.group_id,
-            custom_content=req.content
+            custom_content=req.content,
+            account_id=req.account_id
         )
         return res
     else:

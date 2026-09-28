@@ -11,15 +11,17 @@ from config.categories_filter import (
 )
 from database.db_manager import DatabaseManager
 from modules.outreach.group_keyword_learner import GroupKeywordLearner
+from modules.outreach.group_health_checker import GroupHealthChecker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class FacebookGroupFinder:
-    """Module tự động tìm kiếm Group Facebook THẬT liên quan theo ngành hàng"""
+    """Module tự động tìm kiếm Group Facebook THẬT liên quan theo ngành hàng (kèm kiểm tra tương tác và bài đăng gần nhất)"""
 
     def __init__(self, db: DatabaseManager = None):
         self.db = db or DatabaseManager()
         self.keyword_learner = GroupKeywordLearner(self.db)
+        self.health_checker = GroupHealthChecker(self.db)
 
     @staticmethod
     def _parse_members_count(text: str) -> int:
@@ -85,14 +87,15 @@ class FacebookGroupFinder:
 
         return combined_keywords
 
-    def search_groups(self, category_name: str, max_groups: int = 5) -> List[Dict]:
+    def search_groups(self, category_name: str, max_groups: int = 5, account_id: Optional[object] = None) -> List[Dict]:
         """
         Tìm kiếm các group Facebook THẬT.
-        Yêu cầu đã cấu hình FB_COOKIE hoặc FB_CHROME_PROFILE.
-        Nếu chưa cấu hình, báo lỗi rõ ràng để người dùng nhập thông tin!
+        Yêu cầu đã cấu hình FB_COOKIE hoặc FB_CHROME_PROFILE hoặc tài khoản Facebook.
         """
-        fb_cookie = os.getenv("FB_COOKIE", "")
-        fb_profile = os.getenv("FB_CHROME_PROFILE", "")
+        from modules.outreach.fb_account_manager import resolve_fb_account
+        acc, fb_cookie, fb_profile = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
+        acc_name = acc.get("name") if acc else "Nick Facebook"
+        logging.info(f"🔍 Dò tìm group Facebook bằng tài khoản: [{acc_name}]")
 
         if not fb_cookie and not fb_profile:
             raise RuntimeError(
@@ -172,20 +175,101 @@ class FacebookGroupFinder:
                             real_members = self._parse_members_count(card_text)
                             group_name = text.split("\n")[0].strip()
 
+                            # Lọc nhanh: Bỏ qua nhóm quy mô quá nhỏ (< 500 thành viên)
+                            if real_members > 0 and real_members < 500:
+                                logging.info(f"   ⏩ Bỏ qua nhóm [{group_name}]: Dưới 500 thành viên ({real_members}).")
+                                continue
+
+                            # Kiểm tra xem nhóm đã có trong CSDL chưa
+                            with self.db.get_connection() as conn:
+                                existing = conn.execute("SELECT status FROM fb_groups WHERE group_id = ?", (group_id,)).fetchone()
+                                if existing and existing["status"] in ["APPROVED", "LEFT", "SKIPPED_GHOST"]:
+                                    continue
+
+                            # KIỂM TRA TƯƠNG TÁC VÀ BÀI ĐĂNG GẦN NHẤT TRƯỚC KHI THAM GIA
+                            logging.info(f"   🔍 Đang kiểm tra tương tác và bài đăng gần nhất: [{group_name}] ({clean_url})...")
+                            eval_page = context.new_page()
+                            try:
+                                health = self.health_checker.evaluate_page(eval_page, clean_url, scroll_times=2)
+                            except Exception as e_eval:
+                                logging.warning(f"Lỗi khi kiểm tra sức khỏe nhóm {clean_url}: {e_eval}")
+                                health = {"health_score": 0, "avg_engagement": 0.0, "last_post_hours_ago": None, "verdict": "GHOST"}
+                            finally:
+                                try:
+                                    eval_page.close()
+                                except Exception:
+                                    pass
+
+                            avg_eng = health.get("avg_engagement", 0.0)
+                            last_post_hours = health.get("last_post_hours_ago")
+                            score = health.get("health_score", 0)
+                            verdict = health.get("verdict", "UNKNOWN")
+
+                            # Quy tắc đánh giá tương tác & độ mới của bài viết:
+                            # 1. Tương tác trung bình >= 2.0 (likes/comments)
+                            # 2. Bài đăng gần nhất <= 72 giờ (3 ngày)
+                            # 3. Điểm sức khỏe >= 40 và không phải GHOST
+                            is_low_engagement = (avg_eng < 2.0)
+                            is_dead_feed = (last_post_hours is None or last_post_hours > 72.0)
+                            is_ghost = (score < 40 or verdict == "GHOST")
+
+                            if is_low_engagement or is_dead_feed or is_ghost:
+                                reasons = []
+                                if is_low_engagement:
+                                    reasons.append(f"Tương tác quá thấp ({avg_eng:.1f} < 2.0)")
+                                if is_dead_feed:
+                                    hours_desc = f"{last_post_hours:.1f}h" if last_post_hours is not None else "Không tìm thấy bài"
+                                    reasons.append(f"Bài đăng gần nhất quá cũ ({hours_desc} > 72h)")
+                                if is_ghost:
+                                    reasons.append(f"Điểm sức khỏe thấp ({score}/100, {verdict})")
+
+                                logging.warning(
+                                    f"   🚫 [BỎ QUA GROUP CHẾT/KHÔNG TƯƠNG TÁC]: [{group_name}] - "
+                                    f"Lý do: {', '.join(reasons)}. Không thêm vào danh sách tham gia!"
+                                )
+                                # Lưu với status SKIPPED_GHOST để lần sau không quét lại
+                                self.db.save_group(group_id, group_name, clean_url, category_name, real_members)
+                                self.db.update_group_health(group_id, score, avg_eng, None, health.get("unique_posters", 0), "GHOST")
+                                self.db.update_group_status(group_id, "SKIPPED_GHOST")
+                                continue
+
+                            # Nhóm đạt chuẩn tương tác và độ mới
+                            last_active_str = None
+                            if last_post_hours is not None:
+                                from datetime import timedelta, datetime
+                                approx_dt = datetime.now() - timedelta(hours=last_post_hours)
+                                last_active_str = approx_dt.strftime("%Y-%m-%d %H:%M:%S")
+
                             group_data = {
                                 "group_id": group_id,
                                 "name": group_name,
                                 "url": clean_url,
                                 "category_name": category_name,
                                 "members_count": real_members,
+                                "health_score": score,
+                                "avg_engagement": avg_eng,
+                                "last_post_hours_ago": last_post_hours,
                                 "status": "DISCOVERED"
                             }
                             self.db.save_group(group_id, group_name, clean_url, category_name, real_members)
+                            self.db.update_group_health(
+                                group_id=group_id,
+                                health_score=score,
+                                avg_engagement=avg_eng,
+                                last_active_at=last_active_str,
+                                unique_posters=health.get("unique_posters", 0),
+                                health_verdict=verdict
+                            )
+                            self.db.update_group_status(group_id, "DISCOVERED")
                             
                             # Tự động học từ khóa từ tên nhóm Facebook vừa phát hiện
                             self.keyword_learner.learn_from_group(category_name, group_name)
                             
-                            logging.info(f"   👥 Tìm thấy nhóm thật: [{group_name}] | Thành viên: {real_members:,} | URL: {clean_url}")
+                            logging.info(
+                                f"   ✅ [ĐẠT TIÊU CHUẨN THAM GIA]: [{group_name}] | "
+                                f"TV: {real_members:,} | Tương tác TB: {avg_eng} | "
+                                f"Bài mới nhất: {last_post_hours}h trước | Điểm: {score}/100"
+                            )
                             discovered.append(group_data)
 
                             if len(discovered) >= max_groups:

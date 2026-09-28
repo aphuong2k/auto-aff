@@ -107,7 +107,7 @@ class DealCollector:
 
         with self.db.get_connection() as conn:
             # Kiểm tra deal đã tồn tại chưa
-            existing = conn.execute("SELECT id, price_sale, deal_score FROM deals WHERE item_id = ?", (item_id,)).fetchone()
+            existing = conn.execute("SELECT item_id, price_sale, deal_score FROM deals WHERE item_id = ?", (item_id,)).fetchone()
 
             if existing:
                 conn.execute("""

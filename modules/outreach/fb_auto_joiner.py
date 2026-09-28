@@ -2,7 +2,7 @@ import os
 import time
 import random
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from config.settings import (
     MAX_GROUPS_TO_JOIN_PER_DAY,
@@ -47,10 +47,10 @@ class FacebookAutoJoiner:
                 answers.append("Đồng ý với các điều khoản của nhóm.")
         return answers
 
-    def process_pending_joins(self) -> int:
+    def process_pending_joins(self, account_id: Optional[object] = None) -> int:
         """Thực hiện tham gia các group THẬT trong hàng đợi bằng Playwright"""
-        fb_cookie = os.getenv("FB_COOKIE", "")
-        fb_profile = os.getenv("FB_CHROME_PROFILE", "")
+        from modules.outreach.fb_account_manager import resolve_fb_account
+        acc, fb_cookie, fb_profile = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
 
         if not fb_cookie and not fb_profile:
             raise RuntimeError(
@@ -125,7 +125,7 @@ class FacebookAutoJoiner:
                         self.db.update_group_status(group_id, "PENDING")
                         continue
 
-                    # 0. Đánh giá sức khỏe bảng tin nhóm trước khi Join (Phát hiện Group Ma)
+                    # 0. Đánh giá sức khỏe bảng tin nhóm trước khi Join (Kiểm tra tương tác và bài đăng gần nhất)
                     health = self.health_checker.evaluate_page(page, group_url)
                     last_active = None
                     if health.get("last_post_hours_ago") is not None:
@@ -142,11 +142,29 @@ class FacebookAutoJoiner:
                         health_verdict=health.get("verdict", "UNKNOWN")
                     )
 
-                    if health["health_score"] < 30 or health.get("verdict") == "GHOST":
+                    avg_eng = health.get("avg_engagement", 0.0)
+                    last_post_hours = health.get("last_post_hours_ago")
+                    score = health.get("health_score", 0)
+                    verdict = health.get("verdict", "UNKNOWN")
+
+                    # Kiểm tra tương tác và bài đăng gần nhất
+                    is_low_engagement = (avg_eng < 2.0)
+                    is_dead_feed = (last_post_hours is None or last_post_hours > 72.0)
+                    is_ghost = (score < 40 or verdict == "GHOST")
+
+                    if is_low_engagement or is_dead_feed or is_ghost:
+                        reasons = []
+                        if is_low_engagement:
+                            reasons.append(f"tương tác TB quá thấp ({avg_eng:.1f} < 2.0)")
+                        if is_dead_feed:
+                            hours_desc = f"{last_post_hours:.1f}h" if last_post_hours is not None else "Không tìm thấy bài"
+                            reasons.append(f"bài đăng gần nhất quá cũ ({hours_desc} > 72h)")
+                        if is_ghost:
+                            reasons.append(f"điểm sức khỏe kém ({score}/100, {verdict})")
+
                         logging.warning(
-                            f"🚫 [GROUP MA BỊ BỎ QUA]: Nhóm [{group_name}] có điểm sức khỏe quá thấp "
-                            f"({health['health_score']}/100, {health.get('verdict')}, bài mới nhất: {health.get('last_post_hours_ago')}h trước). "
-                            f"Hủy tham gia để bảo vệ tài khoản!"
+                            f"🚫 [TỪ CHỐI THAM GIA]: Nhóm [{group_name}] không đạt tiêu chuẩn ({', '.join(reasons)}). "
+                            f"Hủy tham gia và đánh dấu SKIPPED_GHOST!"
                         )
                         self.db.update_group_status(group_id, "SKIPPED_GHOST")
                         continue
@@ -251,13 +269,15 @@ class FacebookAutoJoiner:
         logging.info(f"\n🎉 Hoàn thành phiên tự động tham gia nhóm: Đã xử lý {joined_count} nhóm.")
         return joined_count
 
-    def sync_user_joined_groups(self) -> List[Dict]:
+    def sync_user_joined_groups(self, account_id: Optional[object] = None) -> List[Dict]:
         """
         Quét danh sách các nhóm mà tài khoản Facebook hiện tại ĐÃ THAM GIA THỰC TẾ
         (truy cập https://www.facebook.com/groups/joins/ qua Playwright và lưu vào CSDL với status='APPROVED').
         """
-        fb_cookie = os.getenv("FB_COOKIE", "")
-        fb_profile = os.getenv("FB_CHROME_PROFILE", "")
+        from modules.outreach.fb_account_manager import resolve_fb_account
+        acc, fb_cookie, fb_profile = resolve_fb_account(self.db, account_id=account_id, allow_rotation=False)
+        acc_name = acc.get("name") if acc else "Nick Facebook"
+        logging.info(f"🔄 Đồng bộ danh sách nhóm đã tham gia bằng tài khoản: [{acc_name}]")
 
         if not fb_cookie and not fb_profile:
             raise RuntimeError(
