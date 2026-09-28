@@ -293,9 +293,40 @@ export interface AccountWorkloadItem {
 })
 export class AppComponent implements OnInit, OnDestroy {
   apiUrl = 'http://localhost:8000/api';
-  activeTab: 'dashboard' | 'deals' | 'marketing' | 'settings' | 'logs' = 'dashboard';
+  activeTab: 'dashboard' | 'hunt' | 'deals' | 'marketing' | 'settings' | 'logs' = 'dashboard';
   dealsSubTab: 'deals' | 'promotions' | 'vouchers' = 'deals';
   marketingSubTab: 'closed_loop' | 'social_copilot' | 'posts' | 'seeding' | 'groups' = 'closed_loop';
+
+  // --- Quét & Săn Deal (Deal Hunter & Facebook Groups / Telegram Publisher) State ---
+  huntFbTargets: any[] = [];
+  selectedFbHuntTargets: string[] = [];
+  newFbHuntTarget = { name: '', group_url: '', category_name: 'Đa ngành' };
+  showAddFbTargetModal = false;
+  huntTargets: any[] = [];
+  selectedHuntTargets: string[] = ['nghiensandeal', 'mggshopeevn'];
+  newHuntTarget = { name: '', identifier: '', target_type: 'CHANNEL' };
+  showAddTargetModal = false;
+  huntInputMode: 'FB_GROUP' | 'KEYWORD' = 'FB_GROUP';
+  huntKeyword: string = 'Bàn phím cơ';
+  huntQuickKeywords: string[] = ['Bàn phím cơ Aula', 'Tai nghe Sony', 'Giày sneaker nam', 'Điện thoại iPhone', 'Nồi chiên không dầu', 'Áo thun nam', 'Đồng hồ thông minh'];
+  huntSourcePlatform: 'TMALL' | 'LAZADA_MALL' | 'LAZADA_OTHER' | 'ALL' = 'ALL';
+  huntAutoSendTelegram: boolean = false;
+  huntMinDiscountPercent: number = 5;
+  huntTargetChatId: string = '';
+  isHunting: boolean = false;
+  isRescanning: boolean = false;
+  huntSessions: any[] = [];
+  currentHuntSession: any = null;
+  huntClusters: any[] = [];
+  huntedDeals: any[] = [];
+  huntFilterOnlyBetter: boolean = false;
+  huntFilterPlatform: string = 'ALL';
+  selectedClusterForHistory: any = null;
+  clusterPriceHistory: any[] = [];
+  showPriceHistoryModal: boolean = false;
+  loadingPriceHistory: boolean = false;
+  sendingDealTelegram: { [dealId: number]: boolean } = {};
+  testingHuntTelegram: boolean = false;
 
   // Closed-Loop Hub State
   closedLoopStatus: ClosedLoopStatus | null = null;
@@ -730,6 +761,9 @@ export class AppComponent implements OnInit, OnDestroy {
       this.fetchCommissions();
       this.fetchClickAnalytics();
       this.fetchDeals();
+    }
+    if (tab === 'hunt') {
+      this.fetchHuntData();
     }
     if (tab === 'deals') {
       this.fetchDeals();
@@ -2443,5 +2477,295 @@ export class AppComponent implements OnInit, OnDestroy {
       },
       error: (err) => this.triggerToast(err.error?.detail || err.message, 'error')
     });
+  }
+
+  // =========================================================================
+  // HUB: QUÉT & SĂN DEAL ĐA NGUỒN (FACEBOOK GROUPS / TMALL / LAZADA / TELEGRAM)
+  // =========================================================================
+
+  fetchHuntData(): void {
+    // 1. Nạp danh sách Group Facebook mục tiêu
+    this.api.getFbHuntTargets().subscribe({
+      next: (res) => {
+        this.huntFbTargets = res.targets || [];
+        if (this.selectedFbHuntTargets.length === 0 && this.huntFbTargets.length > 0) {
+          // Mặc định chọn 2 nhóm đầu tiên
+          this.selectedFbHuntTargets = this.huntFbTargets.slice(0, 2).map(t => t.group_url);
+        }
+      },
+      error: (err) => console.error('Lỗi nạp mục tiêu Group Facebook:', err)
+    });
+
+    // 2. Nạp mục tiêu Telegram (hỗ trợ thêm/duy trì)
+    this.api.getHuntTargets().subscribe({
+      next: (res) => {
+        this.huntTargets = res.targets || [];
+        if (this.selectedHuntTargets.length === 0 && this.huntTargets.length > 0) {
+          this.selectedHuntTargets = [this.huntTargets[0].identifier];
+        }
+      },
+      error: (err) => console.error('Lỗi nạp mục tiêu Telegram:', err)
+    });
+
+    // 3. Nạp danh sách các phiên săn deal gần đây
+    this.api.getHuntSessions(15).subscribe({
+      next: (res) => {
+        this.huntSessions = res.sessions || [];
+        if (this.huntSessions.length > 0 && !this.currentHuntSession) {
+          this.loadHuntSession(this.huntSessions[0].id);
+        }
+      },
+      error: (err) => console.error('Lỗi nạp phiên săn deal:', err)
+    });
+  }
+
+  saveNewFbHuntTarget(): void {
+    if (!this.newFbHuntTarget.name || !this.newFbHuntTarget.group_url) {
+      this.toast.warning('Vui lòng điền tên nhóm và link Group Facebook!');
+      return;
+    }
+    this.api.saveFbHuntTarget(this.newFbHuntTarget).subscribe({
+      next: () => {
+        this.toast.success('Đã thêm Group Facebook mới thành công!');
+        this.showAddFbTargetModal = false;
+        this.newFbHuntTarget = { name: '', group_url: '', category_name: 'Đa ngành' };
+        this.fetchHuntData();
+      },
+      error: (err) => this.toast.error('Lỗi lưu Group Facebook: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  deleteFbHuntTarget(id: number): void {
+    if (!confirm('Bạn có chắc muốn xóa Group Facebook này khỏi danh sách quét?')) return;
+    this.api.deleteFbHuntTarget(id).subscribe({
+      next: () => {
+        this.toast.success('Đã xóa Group Facebook thành công!');
+        this.fetchHuntData();
+      },
+      error: (err) => this.toast.error('Lỗi xóa nhóm: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  toggleFbHuntTarget(url: string): void {
+    const idx = this.selectedFbHuntTargets.indexOf(url);
+    if (idx > -1) {
+      this.selectedFbHuntTargets.splice(idx, 1);
+    } else {
+      this.selectedFbHuntTargets.push(url);
+    }
+  }
+
+  isFbHuntTargetSelected(url: string): boolean {
+    return this.selectedFbHuntTargets.includes(url);
+  }
+
+  selectAllFbHuntTargets(): void {
+    this.selectedFbHuntTargets = this.huntFbTargets.map(t => t.group_url);
+  }
+
+  deselectAllFbHuntTargets(): void {
+    this.selectedFbHuntTargets = [];
+  }
+
+  saveNewHuntTarget(): void {
+    if (!this.newHuntTarget.name || !this.newHuntTarget.identifier) {
+      this.toast.warning('Vui lòng điền tên và username/link nhóm Telegram!');
+      return;
+    }
+    this.api.saveHuntTarget(this.newHuntTarget).subscribe({
+      next: () => {
+        this.toast.success('Đã thêm nhóm Telegram mới thành công!');
+        this.showAddTargetModal = false;
+        this.newHuntTarget = { name: '', identifier: '', target_type: 'CHANNEL' };
+        this.fetchHuntData();
+      },
+      error: (err) => this.toast.error('Lỗi lưu nhóm Telegram: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  deleteHuntTarget(id: number): void {
+    if (!confirm('Bạn có chắc muốn xóa nhóm Telegram này khỏi danh sách quét?')) return;
+    this.api.deleteHuntTarget(id).subscribe({
+      next: () => {
+        this.toast.success('Đã xóa nhóm Telegram!');
+        this.fetchHuntData();
+      },
+      error: (err) => this.toast.error('Lỗi xóa nhóm: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  toggleHuntTarget(identifier: string): void {
+    const idx = this.selectedHuntTargets.indexOf(identifier);
+    if (idx > -1) {
+      this.selectedHuntTargets.splice(idx, 1);
+    } else {
+      this.selectedHuntTargets.push(identifier);
+    }
+  }
+
+  isHuntTargetSelected(identifier: string): boolean {
+    return this.selectedHuntTargets.includes(identifier);
+  }
+
+  setHuntInputMode(mode: 'FB_GROUP' | 'KEYWORD'): void {
+    this.huntInputMode = mode;
+  }
+
+  setHuntSourcePlatform(platform: any): void {
+    this.huntSourcePlatform = platform;
+  }
+
+  setHuntQuickKeyword(kw: string): void {
+    this.huntKeyword = kw;
+    this.huntInputMode = 'KEYWORD';
+  }
+
+  startHuntScan(): void {
+    if (this.huntInputMode === 'FB_GROUP' && this.selectedFbHuntTargets.length === 0) {
+      this.toast.warning('Vui lòng chọn ít nhất 1 Group Facebook để quét các bài đăng rao bán lấy giá!');
+      return;
+    }
+    if (this.huntInputMode === 'KEYWORD' && (!this.huntKeyword || !this.huntKeyword.trim())) {
+      this.toast.warning('Vui lòng nhập tên sản phẩm cần tìm!');
+      return;
+    }
+
+    this.isHunting = true;
+    const payload = {
+      mode: this.huntInputMode,
+      facebook_targets: this.selectedFbHuntTargets,
+      telegram_targets: this.selectedHuntTargets,
+      keyword: this.huntKeyword,
+      source_platform: this.huntSourcePlatform,
+      auto_send_telegram: this.huntAutoSendTelegram,
+      min_discount_percent: this.huntMinDiscountPercent,
+      target_chat_id: this.huntTargetChatId || undefined
+    };
+
+    this.api.scanAndHuntDeals(payload).subscribe({
+      next: (res) => {
+        this.isHunting = false;
+        this.toast.success(`Quét xong! Tìm thấy ${res.summary?.total_deals_found || 0} deal (${res.summary?.better_deals_count || 0} deal hời giá thấp hơn thị trường).`);
+        this.currentHuntSession = {
+          id: res.session_id,
+          ...res.summary
+        };
+        this.huntClusters = res.clusters || [];
+        this.huntedDeals = res.deals || [];
+        this.fetchHuntData();
+      },
+      error: (err) => {
+        this.isHunting = false;
+        this.toast.error('Lỗi khi quét & săn deal: ' + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  rescanCurrentHunt(): void {
+    if (!this.currentHuntSession?.id) {
+      this.toast.warning('Chưa có phiên quét nào được chọn để quét lại!');
+      return;
+    }
+
+    this.isRescanning = true;
+    this.api.rescanHuntSession(this.currentHuntSession.id).subscribe({
+      next: (res) => {
+        this.isRescanning = false;
+        this.toast.success(res.message || 'Đã quét lại thành công và cập nhật lịch sử giá!');
+        this.huntedDeals = res.deals || [];
+        if (res.summary) {
+          this.currentHuntSession.total_deals_found = res.summary.total_deals_found;
+          this.currentHuntSession.better_deals_count = res.summary.better_deals_count;
+        }
+      },
+      error: (err) => {
+        this.isRescanning = false;
+        this.toast.error('Lỗi khi quét lại: ' + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  loadHuntSession(sessionId: number): void {
+    this.api.getHuntSessionDetail(sessionId).subscribe({
+      next: (res) => {
+        this.currentHuntSession = res.session;
+        this.huntClusters = res.clusters || [];
+        this.huntedDeals = res.deals || [];
+      },
+      error: (err) => console.error('Lỗi tải chi tiết phiên:', err)
+    });
+  }
+
+  openPriceHistoryModal(cluster: any): void {
+    this.selectedClusterForHistory = cluster;
+    this.showPriceHistoryModal = true;
+    this.loadingPriceHistory = true;
+    this.clusterPriceHistory = [];
+
+    this.api.getHuntPriceHistory(cluster.cluster_key).subscribe({
+      next: (res) => {
+        this.loadingPriceHistory = false;
+        this.clusterPriceHistory = res.history || [];
+      },
+      error: (err) => {
+        this.loadingPriceHistory = false;
+        this.toast.error('Lỗi nạp lịch sử giá: ' + (err.error?.detail || err.message));
+      }
+    });
+  }
+
+  closePriceHistoryModal(): void {
+    this.showPriceHistoryModal = false;
+    this.selectedClusterForHistory = null;
+  }
+
+  postDealToTelegram(deal: any): void {
+    if (!deal?.id) return;
+    this.sendingDealTelegram[deal.id] = true;
+
+    this.api.postHuntDealToTelegram(deal.id, this.huntTargetChatId || undefined).subscribe({
+      next: (res) => {
+        this.sendingDealTelegram[deal.id] = false;
+        deal.posted_to_telegram = true;
+        this.toast.success(res.message || `Đã gửi deal "${deal.name.slice(0, 30)}..." tới Telegram!`);
+      },
+      error: (err) => {
+        this.sendingDealTelegram[deal.id] = false;
+        this.toast.error(err.error?.detail || 'Lỗi gửi Telegram!');
+      }
+    });
+  }
+
+  testHuntTelegramConnection(): void {
+    this.testingHuntTelegram = true;
+    this.api.testHuntTelegram(this.huntTargetChatId || undefined).subscribe({
+      next: (res) => {
+        this.testingHuntTelegram = false;
+        this.toast.success(res.message || 'Kết nối Telegram Bot thành công!');
+      },
+      error: (err) => {
+        this.testingHuntTelegram = false;
+        this.toast.error(err.error?.detail || 'Không thể kết nối Telegram Bot!');
+      }
+    });
+  }
+
+  countBetterDeals(): number {
+    return this.huntedDeals.filter(d => d.is_better_deal).length;
+  }
+
+  countPostedTelegram(): number {
+    return this.huntedDeals.filter(d => d.posted_to_telegram).length;
+  }
+
+  get filteredHuntedDeals(): any[] {
+    let list = this.huntedDeals;
+    if (this.huntFilterOnlyBetter) {
+      list = list.filter(d => d.is_better_deal);
+    }
+    if (this.huntFilterPlatform && this.huntFilterPlatform !== 'ALL') {
+      list = list.filter(d => d.platform === this.huntFilterPlatform);
+    }
+    return list;
   }
 }

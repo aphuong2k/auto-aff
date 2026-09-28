@@ -23,6 +23,7 @@ def create_connection(db_path: Union[str, Path] = DB_PATH) -> sqlite3.Connection
         conn.execute("PRAGMA busy_timeout=10000")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA wal_autocheckpoint=100")
     except sqlite3.Error:
         pass
     return conn

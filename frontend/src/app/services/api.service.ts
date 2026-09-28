@@ -219,4 +219,58 @@ export class ApiService {
   resetAllData(): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/reset-data`, {});
   }
+
+  // --- QUÉT & SĂN DEAL (DEAL HUNTER & FACEBOOK / TELEGRAM) ---
+  getFbHuntTargets(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/hunt/fb-targets`);
+  }
+
+  saveFbHuntTarget(target: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/fb-targets`, target);
+  }
+
+  deleteFbHuntTarget(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.baseUrl}/hunt/fb-targets/${id}`);
+  }
+
+  getHuntTargets(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/hunt/targets`);
+  }
+
+  saveHuntTarget(target: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/targets`, target);
+  }
+
+  deleteHuntTarget(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.baseUrl}/hunt/targets/${id}`);
+  }
+
+  scanAndHuntDeals(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/scan`, payload);
+  }
+
+  getHuntSessions(limit: number = 15): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/hunt/sessions?limit=${limit}`);
+  }
+
+  getHuntSessionDetail(sessionId: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/hunt/session/${sessionId}`);
+  }
+
+  rescanHuntSession(sessionId: number): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/rescan/${sessionId}`, {});
+  }
+
+  getHuntPriceHistory(clusterKey: string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/hunt/price-history/${encodeURIComponent(clusterKey)}`);
+  }
+
+  postHuntDealToTelegram(dealId: number, targetChatId?: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/post-telegram/${dealId}`, { target_chat_id: targetChatId });
+  }
+
+  testHuntTelegram(targetChatId?: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/hunt/test-telegram`, { target_chat_id: targetChatId });
+  }
 }
+

@@ -25,6 +25,7 @@ from database.group_repo import GroupRepository
 from database.account_repo import AccountRepository
 from database.analytics_repo import AnalyticsRepository
 from database.workflow_repo import WorkflowRepository
+from database.deal_hunter_repo import DealHunterRepository
 
 
 class DatabaseManager(
@@ -32,7 +33,8 @@ class DatabaseManager(
     GroupRepository,
     AccountRepository,
     AnalyticsRepository,
-    WorkflowRepository
+    WorkflowRepository,
+    DealHunterRepository
 ):
     """
     Master Database Manager Facade
@@ -46,6 +48,24 @@ class DatabaseManager(
         self.init_db()
 
     def init_db(self):
-        """Khởi tạo toàn bộ cấu trúc bảng SQLite và chạy migrations nếu cần"""
-        with self.get_connection() as conn:
-            run_schema_migrations(conn)
+        """Khởi tạo toàn bộ cấu trúc bảng SQLite và chạy migrations nếu cần.
+        Tự động kích hoạt cơ chế phục hồi nếu phát hiện database disk image is malformed.
+        """
+        import sqlite3
+        try:
+            with self.get_connection() as conn:
+                run_schema_migrations(conn)
+        except sqlite3.DatabaseError as e:
+            if "malformed" in str(e).lower():
+                import logging
+                logging.getLogger("DatabaseManager").warning(
+                    f"[AUTO-REPAIR] Phát hiện Database bị hỏng ({e}). Đang tự động phục hồi dữ liệu..."
+                )
+                from scripts.repair_database import repair_database
+                if repair_database(self.db_path):
+                    with self.get_connection() as conn:
+                        run_schema_migrations(conn)
+                else:
+                    raise
+            else:
+                raise

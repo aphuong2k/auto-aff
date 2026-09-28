@@ -49,6 +49,12 @@ import { CommonModule } from '@angular/common';
           </span>
         </button>
 
+        <button class="nav-item" [class.active]="activeTab === 'hunt'" (click)="onSelectTab('hunt')">
+          <span class="icon">🔎</span>
+          <span>Quét & Săn Deal</span>
+          <span class="badge badge-accent" style="background: linear-gradient(135deg, #10b981, #06b6d4); color: #fff; font-weight: 700;">LIVE</span>
+        </button>
+
         <button class="nav-item" [class.active]="activeTab === 'deals'" (click)="onSelectTab('deals')">
           <span class="icon">🛍️</span>
           <span>Săn Deal & Khuyến Mại</span>

@@ -17,6 +17,7 @@
     <header class="top-header">
       <div class="page-title">
         <h1 *ngIf="activeTab === 'dashboard'">Bảng Điều Khiển & Hiệu Quả Doanh Thu (ROI Hub)</h1>
+        <h1 *ngIf="activeTab === 'hunt'">🔎 Quét & Săn Deal Đa Nguồn (Telegram / Tmall / LazMall / Lazada)</h1>
         <h1 *ngIf="activeTab === 'deals'">Quản Lý Deal & Khung Giờ Flash Sale (Shopee & Lazada)</h1>
         <h1 *ngIf="activeTab === 'marketing'">Tiếp Thị, Soạn Bài Đăng & Lan Tỏa Facebook</h1>
         <h1 *ngIf="activeTab === 'settings'">Cấu Hình Hệ Thống, Tài Khoản & Lịch Chạy Tự Động</h1>
@@ -418,6 +419,727 @@
             Chưa có khách hàng đăng ký nhận tin deal. Người dùng truy cập <code>/deals</code> và đăng ký sẽ tự động xuất hiện tại đây!
           </div>
         </ng-template>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- HUB MỚI: 🔎 QUÉT & SĂN DEAL ĐA NGUỒN (TELEGRAM, TMALL & LAZADA) -->
+    <!-- ============================================================== -->
+    <section class="content-body" *ngIf="activeTab === 'hunt'">
+      <!-- Banner Tiêu Đề & Giới Thiệu Tính Năng -->
+      <div class="glass-card" style="margin-bottom: 24px; padding: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 182, 212, 0.12) 50%, rgba(99, 102, 241, 0.12) 100%); border: 1px solid rgba(16, 185, 129, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; color: #10b981; font-weight: 700; margin-bottom: 8px;">
+              <span>⚡</span> TỰ ĐỘNG HÓA SĂN DEAL ĐA NGUỒN THỜI GIAN THỰC
+            </div>
+            <h2 style="font-size: 1.45rem; font-weight: 800; color: #f8fafc; margin: 0 0 6px 0;">
+              🔎 Quét & Săn Deal Đa Nguồn (Group Facebook / Tmall / LazMall / Lazada)
+            </h2>
+            <p style="color: #94a3b8; font-size: 0.88rem; margin: 0; max-width: 850px; line-height: 1.5;">
+              Hệ thống tự động quét các bài đăng rao bán trong một hoặc nhiều Group Facebook đã chọn hoặc theo tên bất kỳ sản phẩm nào, nhận diện và gom các tin đăng cùng loại, tính <strong style="color: #38bdf8;">Giá trung bình & Giá tham chiếu thị trường</strong>, đối chiếu với nguồn đã chọn và <strong style="color: #10b981;">ưu tiên sản phẩm có giá thấp hơn giá tham chiếu</strong> để tự động gửi vào Group/Channel Telegram đã cấu hình.
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button class="btn-primary" [disabled]="isHunting" (click)="startHuntScan()" style="background: linear-gradient(135deg, #10b981, #06b6d4); font-weight: 700; padding: 11px 22px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+              <span *ngIf="!isHunting">🚀 BẮT ĐẦU QUÉT & SĂN</span>
+              <span *ngIf="isHunting">⏳ Đang cào & săn deal...</span>
+            </button>
+            <button class="btn-secondary" [disabled]="isRescanning || !currentHuntSession?.id" (click)="rescanCurrentHunt()" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: #f1f5f9; font-weight: 600; padding: 11px 18px; display: inline-flex; align-items: center; gap: 8px;" title="Cập nhật giá mới nhất nhưng vẫn giữ nguyên lịch sử cũ">
+              <span *ngIf="!isRescanning">🔄 Quét Lại (Giữ Lịch Sử)</span>
+              <span *ngIf="isRescanning">⏳ Đang cập nhật...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Control Panel: Chế độ quét & Chọn Nguồn / Định dạng -->
+      <div class="glass-card" style="margin-bottom: 24px; padding: 22px; border-radius: 16px;">
+        <!-- Hàng 1: Chọn Chế độ quét (Group Facebook vs Nhập tên) -->
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; color: #f1f5f9; font-size: 0.95rem; margin-bottom: 10px;">
+            1️⃣ Chọn Phương Thức Quét:
+          </label>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button 
+              type="button"
+              (click)="setHuntInputMode('FB_GROUP')" 
+              [style.background]="huntInputMode === 'FB_GROUP' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntInputMode === 'FB_GROUP' ? '#38bdf8' : 'rgba(255, 255, 255, 0.12)'"
+              style="flex: 1; min-width: 260px; padding: 14px 18px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #fff; font-size: 0.98rem; display: flex; align-items: center; gap: 8px;">
+                <span>👥</span> Quét từ Group Facebook
+              </div>
+              <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.82rem;">
+                Chọn 1 hoặc nhiều Group Facebook để quét các bài đăng rao bán/pass đồ lấy giá
+              </p>
+            </button>
+
+            <button 
+              type="button"
+              (click)="setHuntInputMode('KEYWORD')" 
+              [style.background]="huntInputMode === 'KEYWORD' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntInputMode === 'KEYWORD' ? '#10b981' : 'rgba(255, 255, 255, 0.12)'"
+              style="flex: 1; min-width: 260px; padding: 14px 18px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #fff; font-size: 0.98rem; display: flex; align-items: center; gap: 8px;">
+                <span>⌨️</span> Nhập Trực Tiếp Tên Bất Kỳ Sản Phẩm Nào
+              </div>
+              <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.82rem;">
+                Bàn phím, quần áo, giày dép, điện thoại, đồ gia dụng... Không giới hạn ngành hàng
+              </p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chi Tiết Input Theo Mode -->
+        <!-- Mode A: Danh sách nhóm Facebook -->
+        <div *ngIf="huntInputMode === 'FB_GROUP'" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 0.88rem; font-weight: 700; color: #cbd5e1;">
+                👥 Chọn Một Hoặc Nhiều Group Facebook Cần Quét (Đã chọn: {{ selectedFbHuntTargets.length }} / {{ huntFbTargets.length }} nhóm):
+              </span>
+              <button type="button" (click)="selectAllFbHuntTargets()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">
+                ✓ Chọn tất cả
+              </button>
+              <button type="button" (click)="deselectAllFbHuntTargets()" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">
+                Bỏ chọn
+              </button>
+            </div>
+            <button class="btn-action-green" (click)="showAddFbTargetModal = true" style="padding: 5px 12px; font-size: 0.8rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              <span>➕ Thêm Group Facebook Mới</span>
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
+            <div 
+              *ngFor="let target of huntFbTargets"
+              (click)="toggleFbHuntTarget(target.group_url)"
+              [style.background]="isFbHuntTargetSelected(target.group_url) ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="isFbHuntTargetSelected(target.group_url) ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'"
+              style="cursor: pointer; padding: 10px 14px; border: 1px solid; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: all 0.2s;"
+            >
+              <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                <input type="checkbox" [checked]="isFbHuntTargetSelected(target.group_url)" style="cursor: pointer; flex-shrink: 0;">
+                <div style="overflow: hidden;">
+                  <strong style="font-size: 0.86rem; color: #fff; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ target.name }}</strong>
+                  <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                    <span style="font-size: 0.7rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 1px 6px; border-radius: 4px;">{{ target.category_name || 'Đa ngành' }}</span>
+                    <a [href]="target.group_url" target="_blank" (click)="$event.stopPropagation()" style="font-size: 0.72rem; color: #94a3b8; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">{{ target.group_url }}</a>
+                  </div>
+                </div>
+              </div>
+              <button (click)="$event.stopPropagation(); deleteFbHuntTarget(target.id)" title="Xóa nhóm này" style="background: none; border: none; color: #ef4444; font-size: 0.95rem; cursor: pointer; padding: 4px; flex-shrink: 0;">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode B: Nhập tên sản phẩm trực tiếp -->
+        <div *ngIf="huntInputMode === 'KEYWORD'" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px;">
+          <div style="margin-bottom: 10px;">
+            <label style="display: block; font-size: 0.88rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">
+              🔍 Nhập Tên Sản Phẩm Cần Săn Deal:
+            </label>
+            <div style="display: flex; gap: 10px;">
+              <input 
+                type="text" 
+                [(ngModel)]="huntKeyword" 
+                placeholder="Ví dụ: Bàn phím cơ Aula F75, Giày Nike Air Force 1, iPhone 15 Pro, Nồi chiên không dầu Philips, Áo thun nam..." 
+                style="flex: 1; padding: 12px 16px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 10px; color: #fff; font-size: 0.95rem;"
+                (keyup.enter)="startHuntScan()"
+              />
+            </div>
+          </div>
+          <!-- Gợi ý nhanh các ngành hàng -->
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.78rem; color: #94a3b8;">Gợi ý phổ biến:</span>
+            <button *ngFor="let kw of huntQuickKeywords"
+              type="button" 
+              (click)="setHuntQuickKeyword(kw)"
+              style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;"
+            >
+              {{ kw }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Hàng 2: Chọn Nguồn / Định dạng cần tìm (Tmall, LazMall, Lazada Khác, All) -->
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; color: #f1f5f9; font-size: 0.95rem; margin-bottom: 10px;">
+            2️⃣ Chọn Nguồn & Định Dạng Cần Tìm:
+          </label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <!-- Nguồn 1: Tmall -->
+            <button 
+              type="button"
+              (click)="setHuntSourcePlatform('TMALL')"
+              [style.background]="huntSourcePlatform === 'TMALL' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntSourcePlatform === 'TMALL' ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'"
+              style="padding: 12px 14px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #ef4444; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🏬</span> Tmall / Taobao
+              </div>
+              <span style="font-size: 0.78rem; color: #94a3b8; display: block; margin-top: 3px;">
+                Gian hàng Tmall Global, Taobao hàng xách tay chính ngạch
+              </span>
+            </button>
+
+            <!-- Nguồn 2: Lazada Mall -->
+            <button 
+              type="button"
+              (click)="setHuntSourcePlatform('LAZADA_MALL')"
+              [style.background]="huntSourcePlatform === 'LAZADA_MALL' ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntSourcePlatform === 'LAZADA_MALL' ? '#f43f5e' : 'rgba(255, 255, 255, 0.1)'"
+              style="padding: 12px 14px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #f43f5e; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🛍️</span> Lazada Mall (LazMall)
+              </div>
+              <span style="font-size: 0.78rem; color: #94a3b8; display: block; margin-top: 3px;">
+                100% Gian hàng chính hãng LazMall có chứng nhận
+              </span>
+            </button>
+
+            <!-- Nguồn 3: Lazada Khác -->
+            <button 
+              type="button"
+              (click)="setHuntSourcePlatform('LAZADA_OTHER')"
+              [style.background]="huntSourcePlatform === 'LAZADA_OTHER' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntSourcePlatform === 'LAZADA_OTHER' ? '#a855f7' : 'rgba(255, 255, 255, 0.1)'"
+              style="padding: 12px 14px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #c084fc; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🛒</span> Các Phân Loại Khác Lazada
+              </div>
+              <span style="font-size: 0.78rem; color: #94a3b8; display: block; margin-top: 3px;">
+                Shop Marketplace, Shop Yêu Thích, Shop Đánh Giá Cao
+              </span>
+            </button>
+
+            <!-- Nguồn 4: Tìm ALL -->
+            <button 
+              type="button"
+              (click)="setHuntSourcePlatform('ALL')"
+              [style.background]="huntSourcePlatform === 'ALL' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)'"
+              [style.borderColor]="huntSourcePlatform === 'ALL' ? '#10b981' : 'rgba(255, 255, 255, 0.1)'"
+              style="padding: 12px 14px; border: 1px solid; border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s;"
+            >
+              <div style="font-weight: 700; color: #10b981; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🌐</span> Tìm Tất Cả (ALL Sàn & Mall)
+              </div>
+              <span style="font-size: 0.78rem; color: #94a3b8; display: block; margin-top: 3px;">
+                So sánh toàn diện giữa Tmall, LazMall, Lazada và Shopee
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Hàng 3: Cấu Hình Tự Động Bắn Telegram Khi Đạt Điều Kiện -->
+        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; color: #f8fafc; font-size: 0.9rem;">
+              <input type="checkbox" [(ngModel)]="huntAutoSendTelegram" style="width: 18px; height: 18px; cursor: pointer;">
+              <span>⚡ Tự động gửi Deal vào Telegram khi GIÁ THẤP HƠN GIÁ THAM CHIẾU</span>
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.8rem; color: #94a3b8;">Chat ID/Kênh:</span>
+              <input 
+                type="text" 
+                [(ngModel)]="huntTargetChatId" 
+                placeholder="Mặc định trong .env" 
+                style="padding: 6px 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; font-size: 0.8rem; width: 150px;"
+              />
+            </div>
+
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.8rem; color: #94a3b8;">Tiết kiệm tối thiểu:</span>
+              <select [(ngModel)]="huntMinDiscountPercent" style="padding: 6px 10px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; font-size: 0.8rem;">
+                <option [value]="0">Tất cả deal rẻ hơn</option>
+                <option [value]="5">Rẻ hơn từ 5%</option>
+                <option [value]="10">Rẻ hơn từ 10%</option>
+                <option [value]="20">Rẻ hơn từ 20%</option>
+                <option [value]="30">Rẻ hơn từ 30%</option>
+              </select>
+            </div>
+
+            <button class="btn-secondary" (click)="testHuntTelegramConnection()" [disabled]="testingHuntTelegram" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px;">
+              {{ testingHuntTelegram ? 'Đang gửi...' : '🧪 Test Telegram' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thống Kê Nhanh Phiên Quét (4 Cards) -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div class="glass-card" style="padding: 18px 20px; border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8; font-size: 0.82rem; font-weight: 600;">CỤM SẢN PHẨM GOM NHÓM</span>
+            <span style="font-size: 1.4rem;">📦</span>
+          </div>
+          <div style="font-size: 1.8rem; font-weight: 800; color: #f8fafc; margin-top: 6px;">
+            {{ huntClusters.length }}
+          </div>
+          <span style="font-size: 0.76rem; color: #38bdf8;">Đã tính Giá tham chiếu & Giá trung bình</span>
+        </div>
+
+        <div class="glass-card" style="padding: 18px 20px; border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8; font-size: 0.82rem; font-weight: 600;">TỔNG SỐ DEAL TÌM THẤY</span>
+            <span style="font-size: 1.4rem;">🛍️</span>
+          </div>
+          <div style="font-size: 1.8rem; font-weight: 800; color: #38bdf8; margin-top: 6px;">
+            {{ huntedDeals.length }}
+          </div>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Nguồn: {{ huntSourcePlatform }}</span>
+        </div>
+
+        <div class="glass-card" style="padding: 18px 20px; border-radius: 14px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.35);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #10b981; font-size: 0.82rem; font-weight: 700;">DEAL RẺ HƠN GIÁ THAM CHIẾU</span>
+            <span style="font-size: 1.4rem;">📉</span>
+          </div>
+          <div style="font-size: 1.8rem; font-weight: 800; color: #10b981; margin-top: 6px;">
+            {{ countBetterDeals() }}
+          </div>
+          <span style="font-size: 0.76rem; color: #34d399; font-weight: 600;">⚡ Ưu tiên hiển thị & phát sóng</span>
+        </div>
+
+        <div class="glass-card" style="padding: 18px 20px; border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8; font-size: 0.82rem; font-weight: 600;">ĐÃ GỬI VÀO TELEGRAM</span>
+            <span style="font-size: 1.4rem;">📢</span>
+          </div>
+          <div style="font-size: 1.8rem; font-weight: 800; color: #f59e0b; margin-top: 6px;">
+            {{ countPostedTelegram() }}
+          </div>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Tự động & Thủ công</span>
+        </div>
+      </div>
+
+      <!-- Section: Danh Sách Nhận Diện & Gom Nhóm Sản Phẩm (Clusters) -->
+      <div class="glass-card" style="margin-bottom: 24px; padding: 22px; border-radius: 16px;" *ngIf="huntClusters.length > 0">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🧩</span> Nhận Diện & Gom Nhóm Sản Phẩm (Tính Giá Trung Bình & Giá Tham Chiếu)
+            </h3>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.82rem;">
+              Hệ thống tự nhận diện các tin đăng cùng một sản phẩm, tính toán giá tham chiếu thị trường (Median) chuẩn xác
+            </p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+          <div 
+            *ngFor="let cluster of huntClusters"
+            style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;"
+          >
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: #f1f5f9; line-height: 1.4;">
+                  {{ cluster.product_name }}
+                </h4>
+                <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">
+                  {{ cluster.sample_count }} tin đăng
+                </span>
+              </div>
+              <div style="font-size: 0.76rem; color: #94a3b8; margin-bottom: 12px;">
+                Khóa cụm: <code style="color: #cbd5e1;">{{ cluster.cluster_key }}</code>
+              </div>
+
+              <!-- Thẻ Giá Tham Chiếu & Giá Trung Bình -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 8px; margin-bottom: 12px;">
+                <div>
+                  <span style="display: block; font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Giá Tham Chiếu</span>
+                  <strong style="font-size: 1.05rem; color: #10b981;">{{ cluster.reference_price | number }}đ</strong>
+                </div>
+                <div>
+                  <span style="display: block; font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Giá Trung Bình</span>
+                  <span style="font-size: 0.95rem; color: #f1f5f9; font-weight: 600;">{{ cluster.avg_price | number }}đ</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 10px; margin-top: 6px;">
+              <span style="font-size: 0.75rem; color: #94a3b8;">
+                Biên độ: {{ cluster.min_price | number }}đ - {{ cluster.max_price | number }}đ
+              </span>
+              <button class="btn-link" (click)="openPriceHistoryModal(cluster)" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px; padding: 0;">
+                <span>📈 Lịch Sử Giá</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Danh Sách Deal Săn Được (Dynamic Deal Table & Cards) -->
+      <div class="glass-card" style="padding: 22px; border-radius: 16px;">
+        <!-- Header Bảng Deal & Bộ Lọc -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>🛍️</span> Danh Sách Deal Động Săn Được ({{ filteredHuntedDeals.length }} Sản Phẩm)
+            </h3>
+            <span style="font-size: 0.8rem; color: #94a3b8;">
+              Tự động đối chiếu giá và ưu tiên hiển thị các sản phẩm có giá thấp hơn giá tham chiếu lên hàng đầu
+            </span>
+          </div>
+
+          <!-- Bộ lọc Deal -->
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <!-- Lọc chỉ deal hời -->
+            <label style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 0.82rem; color: #34d399; font-weight: 700;">
+              <input type="checkbox" [(ngModel)]="huntFilterOnlyBetter" style="cursor: pointer;">
+              <span>📉 Chỉ Hiện Deal Rẻ Hơn Tham Chiếu</span>
+            </label>
+
+            <!-- Lọc sàn -->
+            <select [(ngModel)]="huntFilterPlatform" style="padding: 6px 12px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.82rem;">
+              <option value="ALL">Tất Cả Nguồn (Tmall / LazMall / Lazada / Shopee)</option>
+              <option value="TMALL">Chỉ Tmall</option>
+              <option value="LAZADA_MALL">Chỉ Lazada Mall</option>
+              <option value="LAZADA_OTHER">Chỉ Lazada Khác</option>
+              <option value="SHOPEE">Chỉ Shopee</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Trạng thái trống -->
+        <div *ngIf="filteredHuntedDeals.length === 0" style="text-align: center; padding: 48px 16px;">
+          <div style="font-size: 2.8rem; margin-bottom: 12px;">🔍</div>
+          <h4 style="color: #f1f5f9; font-size: 1.1rem; margin-bottom: 6px;">Chưa Có Deal Nào Được Quét</h4>
+          <p style="color: #94a3b8; font-size: 0.88rem; max-width: 500px; margin: 0 auto 18px auto;">
+            Hãy chọn nhóm Telegram hoặc nhập tên sản phẩm bất kỳ ở trên rồi bấm <strong>"Bắt Đầu Quét & Săn"</strong> để tìm các deal hời giá rẻ hơn thị trường!
+          </p>
+          <button class="btn-primary" (click)="startHuntScan()">🚀 Bắt Đầu Quét Ngay</button>
+        </div>
+
+        <!-- Lưới Deal Động -->
+        <div *ngIf="filteredHuntedDeals.length > 0" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px;">
+          <div 
+            *ngFor="let deal of filteredHuntedDeals"
+            [style.borderColor]="deal.is_better_deal ? '#10b981' : 'rgba(255, 255, 255, 0.08)'"
+            [style.background]="deal.is_better_deal ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%)' : 'rgba(15, 23, 42, 0.6)'"
+            style="border: 1px solid; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s;"
+          >
+            <!-- Phần Ảnh & Huy Hiệu Sàn -->
+            <div style="position: relative; height: 180px; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              <img 
+                *ngIf="deal.image_url" 
+                [src]="deal.image_url" 
+                [alt]="deal.name"
+                loading="lazy"
+                style="width: 100%; height: 100%; object-fit: cover;"
+                (error)="deal.image_url = ''"
+              />
+              <div *ngIf="!deal.image_url" style="font-size: 3rem; color: #475569;">
+                🛍️
+              </div>
+
+              <!-- Badge Nguồn / Phân Loại -->
+              <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 6px;">
+                <span 
+                  *ngIf="deal.platform === 'TMALL'" 
+                  style="background: linear-gradient(135deg, #ef4444, #f59e0b); color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"
+                >
+                  🏬 TMALL
+                </span>
+                <span 
+                  *ngIf="deal.platform === 'LAZADA_MALL'" 
+                  style="background: #f43f5e; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"
+                >
+                  🛍️ LAZMALL
+                </span>
+                <span 
+                  *ngIf="deal.platform === 'LAZADA_OTHER'" 
+                  style="background: #a855f7; color: #fff; font-weight: 700; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;"
+                >
+                  🛒 LAZADA KHÁC
+                </span>
+                <span 
+                  *ngIf="deal.platform === 'SHOPEE'" 
+                  style="background: #f97316; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;"
+                >
+                  🔥 SHOPEE
+                </span>
+              </div>
+
+              <!-- Badge Deal Hời Rẻ Hơn Tham Chiếu -->
+              <div 
+                *ngIf="deal.is_better_deal" 
+                style="position: absolute; bottom: 8px; right: 8px; background: rgba(16, 185, 129, 0.95); color: #022c22; font-weight: 800; font-size: 0.75rem; padding: 3px 9px; border-radius: 8px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);"
+              >
+                📉 DEAL HỜI: -{{ deal.price_diff | number }}đ
+              </div>
+            </div>
+
+            <!-- Phần Thông Tin Chi Tiết -->
+            <div style="padding: 14px 16px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <h4 style="margin: 0 0 6px 0; font-size: 0.92rem; font-weight: 700; color: #f8fafc; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8em;" [title]="deal.name">
+                  {{ deal.name }}
+                </h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: #94a3b8; margin-bottom: 10px;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" [title]="deal.seller_name">
+                    Shop: {{ deal.seller_name || 'Uy Tín' }}
+                  </span>
+                  <span>{{ deal.location || 'Việt Nam' }}</span>
+                </div>
+
+                <!-- So Sánh Giá: Giá Tham Chiếu vs Giá Bán Sàn -->
+                <div style="background: rgba(0, 0, 0, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 0.74rem; color: #94a3b8;">Giá Tham Chiếu:</span>
+                    <span style="font-size: 0.85rem; color: #cbd5e1; text-decoration: line-through;">
+                      {{ deal.reference_price | number }}đ
+                    </span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc;">Giá Bán Trên Sàn:</span>
+                    <strong style="font-size: 1.15rem; color: #f59e0b; font-weight: 800;">
+                      {{ deal.sale_price | number }}đ
+                    </strong>
+                  </div>
+
+                  <!-- Huy hiệu chênh lệch giá -->
+                  <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.74rem; color: #94a3b8;">Chênh lệch:</span>
+                    <span *ngIf="deal.is_better_deal" style="font-size: 0.8rem; font-weight: 800; color: #10b981;">
+                      Rẻ hơn {{ deal.savings_percent }}% (-{{ deal.price_diff | number }}đ)
+                    </span>
+                    <span *ngIf="!deal.is_better_deal" style="font-size: 0.76rem; color: #94a3b8;">
+                      Cao hơn +{{ -deal.price_diff | number }}đ
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Thông số uy tín -->
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: #94a3b8; margin-bottom: 12px;">
+                  <span>⭐ {{ deal.rating_star }} đánh giá</span>
+                  <span>Đã bán: {{ deal.historical_sold | number }}</span>
+                </div>
+              </div>
+
+              <!-- Hàng Nút Thao Tác (Link Aff & Gửi Telegram) -->
+              <div style="display: flex; gap: 8px;">
+                <a 
+                  [href]="deal.aff_url || deal.item_url" 
+                  target="_blank" 
+                  class="btn-primary" 
+                  style="flex: 1; text-align: center; text-decoration: none; padding: 8px 10px; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"
+                >
+                  <span>🛒 Link Mua ↗</span>
+                </a>
+
+                <button 
+                  type="button" 
+                  (click)="postDealToTelegram(deal)"
+                  [disabled]="sendingDealTelegram[deal.id]"
+                  [style.background]="deal.posted_to_telegram ? 'rgba(16, 185, 129, 0.25)' : 'rgba(56, 189, 248, 0.2)'"
+                  [style.color]="deal.posted_to_telegram ? '#10b981' : '#38bdf8'"
+                  [style.borderColor]="deal.posted_to_telegram ? '#10b981' : 'rgba(56, 189, 248, 0.4)'"
+                  style="border: 1px solid; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;"
+                  [title]="deal.posted_to_telegram ? 'Đã gửi vào Telegram thành công' : 'Bắn deal này ngay lập tức vào Telegram'"
+                >
+                  <span *ngIf="deal.posted_to_telegram">✅ Đã Gửi</span>
+                  <span *ngIf="!deal.posted_to_telegram && !sendingDealTelegram[deal.id]">📢 Telegram</span>
+                  <span *ngIf="sendingDealTelegram[deal.id]">⏳...</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- MODAL: THÊM GROUP FACEBOOK MỚI ĐỂ QUÉT GIÁ -->
+      <!-- ============================================================== -->
+      <div class="modal-backdrop" *ngIf="showAddFbTargetModal" (click)="showAddFbTargetModal = false">
+        <div class="modal-card glass-card" (click)="$event.stopPropagation()" style="max-width: 480px; width: 90%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>➕</span> Thêm Group Facebook Cần Quét Giá
+            </h3>
+            <button (click)="showAddFbTargetModal = false" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Tên gợi nhớ nhóm:
+            </label>
+            <input 
+              type="text" 
+              [(ngModel)]="newFbHuntTarget.name" 
+              placeholder="Ví dụ: Chợ Bàn Phím Cơ Hà Nội, Góc Pass Đồ Sneaker..." 
+              style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;"
+            />
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Link Group Facebook hoặc ID nhóm:
+            </label>
+            <input 
+              type="text" 
+              [(ngModel)]="newFbHuntTarget.group_url" 
+              placeholder="Ví dụ: https://www.facebook.com/groups/chophimcovn/ hoặc ID/slug" 
+              style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;"
+            />
+            <small style="color: #94a3b8; font-size: 0.78rem; display: block; margin-top: 4px;">
+              Hệ thống sẽ cào các bài đăng rao bán trong bảng tin nhóm này để bóc tách sản phẩm và giá tham chiếu
+            </small>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Ngành hàng chính của nhóm:
+            </label>
+            <select [(ngModel)]="newFbHuntTarget.category_name" style="width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;">
+              <option value="Thiết Bị Điện Tử">Thiết Bị Điện Tử & Công Nghệ</option>
+              <option value="Thời Trang Nam">Thời Trang Nam & Giày Dép</option>
+              <option value="Thời Trang Nữ">Thời Trang Nữ & Phụ Kiện</option>
+              <option value="Thiết Bị Điện Gia Dụng">Đồ Gia Dụng & Nhà Cửa</option>
+              <option value="Đa ngành">Tổng Hợp / Đa Ngành</option>
+            </select>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-secondary" (click)="showAddFbTargetModal = false">Hủy</button>
+            <button class="btn-primary" (click)="saveNewFbHuntTarget()">Lưu Group</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- MODAL: THÊM NHÓM TELEGRAM MỚI (TƯƠNG THÍCH) -->
+      <!-- ============================================================== -->
+      <div class="modal-backdrop" *ngIf="showAddTargetModal" (click)="showAddTargetModal = false">
+        <div class="modal-card glass-card" (click)="$event.stopPropagation()" style="max-width: 480px; width: 90%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>➕</span> Thêm Nhóm / Kênh Telegram Cần Quét
+            </h3>
+            <button (click)="showAddTargetModal = false" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Tên gợi nhớ nhóm:
+            </label>
+            <input 
+              type="text" 
+              [(ngModel)]="newHuntTarget.name" 
+              placeholder="Ví dụ: Chợ Công Nghệ Hà Nội, Hội Săn Bàn Phím Cơ..." 
+              style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;"
+            />
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Username (&#64;...) hoặc Link t.me/s/... :
+            </label>
+            <input 
+              type="text" 
+              [(ngModel)]="newHuntTarget.identifier" 
+              placeholder="Ví dụ: nghiensandeal hoặc https://t.me/s/deal_cong_nghe" 
+              style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;"
+            />
+            <small style="color: #94a3b8; font-size: 0.78rem; display: block; margin-top: 4px;">
+              Hỗ trợ cả nhóm công khai (kênh t.me/s/...) và nhóm riêng tư (thông qua Telegram Bot API)
+            </small>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+              Loại mục tiêu:
+            </label>
+            <select [(ngModel)]="newHuntTarget.target_type" style="width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem;">
+              <option value="CHANNEL">Kênh Telegram (Channel công khai)</option>
+              <option value="GROUP">Group / Nhóm Chat Trao Đổi</option>
+              <option value="CHAT">Chat Riêng / Bot Chat ID</option>
+            </select>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-secondary" (click)="showAddTargetModal = false">Hủy</button>
+            <button class="btn-primary" (click)="saveNewHuntTarget()">Lưu Nhóm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- MODAL: LỊCH SỬ BIẾN ĐỘNG GIÁ THEO THỜI GIAN -->
+      <!-- ============================================================== -->
+      <div class="modal-backdrop" *ngIf="showPriceHistoryModal" (click)="closePriceHistoryModal()">
+        <div class="modal-card glass-card" (click)="$event.stopPropagation()" style="max-width: 680px; width: 90%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                <span>📈</span> Lịch Sử Biến Động Giá & Quét Lại
+              </h3>
+              <p style="margin: 4px 0 0 0; color: #38bdf8; font-size: 0.85rem; font-weight: 600;">
+                {{ selectedClusterForHistory?.product_name }}
+              </p>
+            </div>
+            <button (click)="closePriceHistoryModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 16px;">
+            Dữ liệu giá được lưu trữ và tích lũy liên tục qua các lần <strong>Quét Lại</strong> để giúp bạn theo dõi biến động giá thị trường theo thời gian thực.
+          </p>
+
+          <div *ngIf="loadingPriceHistory" style="text-align: center; padding: 24px; color: #38bdf8;">
+            ⏳ Đang tải lịch sử giá...
+          </div>
+
+          <div *ngIf="!loadingPriceHistory && clusterPriceHistory.length === 0" style="text-align: center; padding: 24px; color: #94a3b8;">
+            Chưa có lịch sử biến động giá cho sản phẩm này. Hãy bấm "Quét Lại" để bắt đầu ghi nhận các mốc giá mới.
+          </div>
+
+          <div *ngIf="!loadingPriceHistory && clusterPriceHistory.length > 0" style="max-height: 380px; overflow-y: auto;">
+            <table class="table-custom" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; text-align: left;">
+                  <th style="padding: 8px 10px;">Thời Điểm</th>
+                  <th style="padding: 8px 10px;">Nguồn</th>
+                  <th style="padding: 8px 10px;">Giá Sàn</th>
+                  <th style="padding: 8px 10px;">Giá Tham Chiếu</th>
+                  <th style="padding: 8px 10px;">Chênh Lệch</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let h of clusterPriceHistory" style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 8px 10px; color: #cbd5e1;">{{ h.recorded_at }}</td>
+                  <td style="padding: 8px 10px;">
+                    <span style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">
+                      {{ h.platform }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px 10px; color: #f59e0b; font-weight: 700;">{{ h.price | number }}đ</td>
+                  <td style="padding: 8px 10px; color: #cbd5e1; text-decoration: line-through;">{{ h.reference_price | number }}đ</td>
+                  <td style="padding: 8px 10px;">
+                    <span *ngIf="h.price_diff > 0" style="color: #10b981; font-weight: 700;">
+                      -{{ h.price_diff | number }}đ (Rẻ hơn)
+                    </span>
+                    <span *ngIf="h.price_diff <= 0" style="color: #94a3b8;">
+                      +{{ -h.price_diff | number }}đ
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+            <button class="btn-primary" (click)="closePriceHistoryModal()">Đóng</button>
+          </div>
+        </div>
       </div>
     </section>
 

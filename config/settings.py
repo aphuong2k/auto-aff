@@ -24,7 +24,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(RAW_IMAGES_DIR, exist_ok=True)
 os.makedirs(PROCESSED_IMAGES_DIR, exist_ok=True)
 
-DB_PATH = DATA_DIR / "affiliate_system.db"
+DB_PATH = Path(os.getenv("DB_PATH", str(DATA_DIR / "affiliate_system.db")))
 LOG_FILE_PATH = LOG_DIR / "automation.log"
 FB_SEEDING_LOG_PATH = LOG_DIR / "facebook_seeding.log"
 

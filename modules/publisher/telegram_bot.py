@@ -1,7 +1,7 @@
 import requests
 import logging
 import os
-from typing import Dict
+from typing import Dict, Optional, List, Any
 from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 from modules.affiliate.content_writer import DealContentWriter
 from modules.affiliate.image_stamper import ImageBannerStamper
@@ -219,4 +219,88 @@ class TelegramPublisher:
             telegram_circuit_breaker.record_failure(e)
             logging.warning(f"Lỗi gửi cảnh báo tới Telegram: {e}")
             return False
+
+    def publish_hunted_deal(self, deal: Dict, target_chat_id: Optional[str] = None) -> bool:
+        """
+        Tự động định dạng và gửi Deal săn được (rẻ hơn giá tham chiếu) tới Group/Channel Telegram đã cấu hình.
+        Hỗ trợ chỉ định chat_id cụ thể hoặc dùng TELEGRAM_CHAT_ID mặc định.
+        """
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or self.bot_token
+        dest_chat = target_chat_id or os.getenv("TELEGRAM_CHAT_ID") or self.chat_id
+
+        if not self.bot_token or not dest_chat:
+            logging.warning(
+                f"⚠️ Bỏ qua gửi Telegram cho deal săn được [{deal.get('name', '')[:30]}]: "
+                "Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID."
+            )
+            return False
+
+        name = deal.get("name", "Sản phẩm Hot Deal")
+        platform = deal.get("platform", "LAZADA")
+        seller = deal.get("seller_name", "Shop Uy Tín")
+        ref_price = float(deal.get("reference_price", 0))
+        sale_price = float(deal.get("sale_price", 0))
+        diff = float(deal.get("price_diff", 0))
+        savings_pct = float(deal.get("savings_percent", 0))
+        aff_url = deal.get("aff_url") or deal.get("item_url", "")
+        rating = deal.get("rating_star", 5.0)
+        sold = deal.get("historical_sold", 0)
+
+        # Định dạng bài đăng chuyên nghiệp
+        caption = (
+            f"⚡ <b>[SĂN ĐƯỢC DEAL HỜI - DƯỚI GIÁ THỊ TRƯỜNG]</b>\n\n"
+            f"📦 <b>Sản phẩm:</b> {name}\n"
+            f"🏢 <b>Nguồn:</b> <code>{platform}</code> ({seller})\n\n"
+            f"📊 <b>Giá tham chiếu:</b> <s>{ref_price:,.0f}đ</s>\n"
+            f"🔥 <b>Giá săn được:</b> <b>{sale_price:,.0f}đ</b>\n"
+            f"📉 <b>Tiết kiệm ngay:</b> <b>-{diff:,.0f}đ (-{savings_pct}%)</b>\n\n"
+            f"⭐ Đánh giá: <b>{rating} ⭐</b> | Đã bán: <b>{sold:,}</b>\n\n"
+            f"👉 <b>Bấm link chốt đơn ngay:</b> <a href=\"{aff_url}\">MUA NGAY TẠI ĐÂY ↗</a>"
+        )
+
+        image_url = deal.get("image_url", "")
+
+        # 1. Ưu tiên gửi ảnh kèm caption qua sendPhoto
+        if image_url:
+            try:
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{self.bot_token}/sendPhoto",
+                    json={
+                        "chat_id": dest_chat,
+                        "photo": image_url,
+                        "caption": caption,
+                        "parse_mode": "HTML"
+                    },
+                    timeout=15
+                )
+                if resp.status_code == 200:
+                    logging.info(f"✅ Đã gửi deal săn được [{name[:30]}...] tới Telegram ({dest_chat})!")
+                    return True
+                else:
+                    logging.warning(f"Gửi ảnh Telegram thất bại (HTTP {resp.status_code}): {resp.text}. Sẽ gửi text fallback.")
+            except Exception as e:
+                logging.warning(f"Lỗi khi gửi ảnh deal tới Telegram: {e}")
+
+        # 2. Fallback gửi tin nhắn text qua sendMessage
+        try:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                json={
+                    "chat_id": dest_chat,
+                    "text": caption,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": False
+                },
+                timeout=12
+            )
+            if resp.status_code == 200:
+                logging.info(f"✅ Đã gửi text deal săn được [{name[:30]}...] tới Telegram ({dest_chat})!")
+                return True
+            else:
+                logging.warning(f"Telegram sendMessage trả về lỗi {resp.status_code}: {resp.text}")
+                return False
+        except Exception as e:
+            logging.warning(f"Lỗi khi gửi text deal tới Telegram: {e}")
+            return False
+
 

@@ -43,6 +43,7 @@ from api.outreach_router import router as outreach_router
 from api.analytics_router import router as analytics_router
 from api.settings_router import router as settings_router
 from api.portal_router import router as portal_router, anti_ban_redirect
+from api.hunt_router import router as hunt_router
 
 # Khởi tạo FastAPI App
 app = FastAPI(
@@ -73,6 +74,7 @@ app.include_router(outreach_router)
 app.include_router(analytics_router)
 app.include_router(settings_router)
 app.include_router(portal_router)
+app.include_router(hunt_router)
 
 # Phục vụ Frontend Admin Dashboard (Angular production build)
 frontend_dist = BASE_DIR / "frontend" / "dist" / "frontend" / "browser"

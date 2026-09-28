@@ -353,6 +353,119 @@ def init_db(conn: sqlite3.Connection):
         )
     """)
 
+    # 22. Bảng quản lý mục tiêu Group / Channel Telegram cần quét deal
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS telegram_scan_targets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            target_type TEXT DEFAULT 'CHANNEL', -- 'CHANNEL', 'GROUP', 'CHAT'
+            identifier TEXT NOT NULL UNIQUE,     -- '@username', 'https://t.me/...', or '-100...'
+            is_active INTEGER DEFAULT 1,
+            last_scanned_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 23. Bảng phiên quét & săn deal (Deal Hunt Sessions)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS deal_hunt_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_name TEXT,
+            mode TEXT NOT NULL,                  -- 'TELEGRAM_GROUP' hoặc 'KEYWORD'
+            source_platform TEXT NOT NULL,       -- 'TMALL', 'LAZADA_MALL', 'LAZADA_OTHER', 'ALL'
+            input_query TEXT,                    -- Chuỗi từ khóa hoặc danh sách nhóm Telegram
+            auto_send_telegram INTEGER DEFAULT 0,
+            min_discount_percent INTEGER DEFAULT 5,
+            status TEXT DEFAULT 'COMPLETED',     -- 'RUNNING', 'COMPLETED', 'FAILED'
+            total_clusters INTEGER DEFAULT 0,
+            total_deals_found INTEGER DEFAULT 0,
+            better_deals_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 24. Bảng cụm sản phẩm nhận diện & gom nhóm (Product Clusters & Giá tham chiếu)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scanned_product_clusters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER,
+            cluster_key TEXT NOT NULL,           -- Khóa chuẩn hóa (vd: aula_f75_ban_phim_co)
+            product_name TEXT NOT NULL,
+            category_name TEXT DEFAULT 'Đa ngành',
+            reference_price REAL NOT NULL,       -- Giá tham chiếu thị trường (Median / chuẩn đối chiếu)
+            avg_price REAL NOT NULL,             -- Giá trung bình các tin đăng/mẫu
+            min_price REAL NOT NULL,
+            max_price REAL NOT NULL,
+            sample_count INTEGER DEFAULT 1,      -- Số tin đăng / lượt rao bán được gom
+            source_samples TEXT,                 -- Dữ liệu JSON các mẫu tin đăng đã quét
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES deal_hunt_sessions (id)
+        )
+    """)
+
+    # 25. Bảng lưu trữ Deal săn được từ các nguồn đã chọn (Hunted Deals)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hunted_deals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER,
+            cluster_id INTEGER,
+            platform TEXT NOT NULL,              -- 'TMALL', 'LAZADA_MALL', 'LAZADA_OTHER', 'SHOPEE', 'ALL'
+            item_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            reference_price REAL NOT NULL,       -- Giá tham chiếu
+            sale_price REAL NOT NULL,            -- Giá bán thực tế trên nguồn
+            original_price REAL,                 -- Giá niêm yết
+            price_diff REAL NOT NULL,            -- reference_price - sale_price (>0 là rẻ hơn tham chiếu)
+            savings_percent REAL NOT NULL,       -- Tỷ lệ % tiết kiệm so với giá tham chiếu
+            is_better_deal INTEGER DEFAULT 0,    -- 1 nếu sale_price < reference_price
+            rating_star REAL DEFAULT 5.0,
+            historical_sold INTEGER DEFAULT 0,
+            item_url TEXT NOT NULL,
+            aff_url TEXT,
+            image_url TEXT,
+            seller_name TEXT,
+            location TEXT,
+            status TEXT DEFAULT 'FOUND',
+            posted_to_telegram INTEGER DEFAULT 0,
+            posted_telegram_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES deal_hunt_sessions (id),
+            FOREIGN KEY (cluster_id) REFERENCES scanned_product_clusters (id)
+        )
+    """)
+
+    # 26. Bảng lưu lịch sử giá theo thời gian (Giữ lịch sử cũ khi Quét lại)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hunt_price_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cluster_key TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            item_id TEXT,
+            price REAL NOT NULL,
+            reference_price REAL NOT NULL,
+            price_diff REAL NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 27. Bảng quản lý mục tiêu Group Facebook cần quét bài lấy giá
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS facebook_scan_targets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            group_url TEXT NOT NULL UNIQUE,      -- Link nhóm: https://facebook.com/groups/...
+            group_id TEXT,                       -- ID hoặc slug của nhóm
+            category_name TEXT DEFAULT 'Đa ngành',
+            is_active INTEGER DEFAULT 1,
+            last_scanned_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # =========================================================================
     # TỰ ĐỘNG MIGRATE CÁC CỘT MỞ RỘNG (ALTER TABLE)
     # =========================================================================
